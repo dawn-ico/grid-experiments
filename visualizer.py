@@ -239,47 +239,6 @@ def apply_perms(fields, perms):
             field[:] = field[perm, :]
 
 
-def get_down_up_triangles(grid: Grid):
-
-    nc = grid.nc
-    c2e, c2v, e2c = grid.c2e, grid.c2v, grid.e2c
-    clat, vlat = grid.c_lon_lat[:, 1], grid.v_lon_lat[:, 1]
-
-    c2c = chain(c2e, e2c)
-
-    valid_neighbor_triangles = (c2c != DEVICE_MISSING_VALUE)
-    clat_neighbor_triangles = clat[c2c]
-    lowest_triangle_point = np.min(vlat[c2v], axis=-1).reshape(nc, 1, 1)
-    highest_triangle_point = np.max(vlat[c2v], axis=-1).reshape(nc, 1, 1)
-
-    down_triangle_indices = np.nonzero(
-        valid_neighbor_triangles &
-        (
-            lowest_triangle_point
-            >
-            clat_neighbor_triangles
-        )
-    )
-    up_triangle_indices = np.nonzero(
-        valid_neighbor_triangles &
-        (
-            highest_triangle_point
-            <
-            clat_neighbor_triangles
-        )
-    )
-
-    down_triangles = c2c[down_triangle_indices]
-    up_triangles = c2c[up_triangle_indices]
-
-    down_triangle_relationship = np.full(nc, fill_value=DEVICE_MISSING_VALUE)
-    down_triangle_relationship[down_triangle_indices[0]] = down_triangles
-    up_triangle_relationship = np.full(nc, fill_value=DEVICE_MISSING_VALUE)
-    up_triangle_relationship[up_triangle_indices[0]] = up_triangles
-
-    return down_triangle_relationship, up_triangle_relationship
-
-
 class UnsupportedPentagonException(Exception):
     pass
 
@@ -625,6 +584,7 @@ def main():
         #vertices = plot_vertices(ax, grid, field=grid.ncf.variables["parent_vertex_index"][:][v_perm])
         vertices = plot_vertices(ax, grid, field=np.arange(grid.nv))
         #vertices = plot_vertices(ax, grid, field=v_grf)
+
         # transparent edges
         vertices.set_edgecolor((0, 0, 0, 0))
         fig.colorbar(vertices, ax=ax)
@@ -633,6 +593,7 @@ def main():
         #edges = plot_edges(ax, grid, field=grid.ncf.variables["parent_edge_index"][:][e_perm])
         edges = plot_edges(ax, grid, field=np.arange(grid.ne))
         #edges = plot_edges(ax, grid, field=e_grf)
+
         # transparent edges
         edges.set_edgecolor((0, 0, 0, 0))
         fig.colorbar(edges, ax=ax)
@@ -641,11 +602,6 @@ def main():
         #cells = plot_cells(ax, grid, field=grid.ncf.variables["parent_cell_index"][:][c_perm])
         cells = plot_cells(ax, grid, field=np.arange(grid.nc))
         #cells = plot_cells(ax, grid, field=c_grf)
-
-        #down_triangles, up_triangles = get_down_up_triangles(grid)
-        #t = np.zeros(grid.nc)
-        #t[up_triangles[np.nonzero(up_triangles != DEVICE_MISSING_VALUE)]] = 1
-        #cells = plot_cells(ax, grid, field=t)
 
         # transparent edges
         cells.set_edgecolor((0, 0, 0, 0))
@@ -659,10 +615,6 @@ def main():
     #ax.plot(grid.v_lon_lat[v_compute_domain_start:, 0], grid.v_lon_lat[v_compute_domain_start:, 1], 'o-')
     #ax.plot(grid.e_lon_lat[e_compute_domain_start:, 0], grid.e_lon_lat[e_compute_domain_start:, 1], 'o-')
     #ax.plot(grid.c_lon_lat[c_compute_domain_start:, 0], grid.c_lon_lat[c_compute_domain_start:, 1], 'o-')
-
-    #lon_sorted = grid.c_lon_lat[np.argsort(grid.c_lon_lat[:, 0])]
-    #lat_lon_sorted = lon_sorted[np.argsort(lon_sorted[:, 1], kind="stable")]
-    #ax.plot(lat_lon_sorted[:, 0], lat_lon_sorted[:, 1])
 
     if grid_modified is not None:
         store(grid_modified)
