@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import annotations
 from functools import cmp_to_key
 import dataclasses
 import numpy as np
@@ -7,22 +8,16 @@ from matplotlib import (
     patches,
     collections,
 )
-import netCDF4 as nc
+import netCDF4
 
 
 NaN = float("nan")
 DEVICE_MISSING_VALUE = -2
 
 
-def chain(*chains):
-    indices = chains[0]
-    for chain in chains[1:]:
-        indices = chain[indices]
-    return indices
-
-
 @dataclasses.dataclass
 class Grid:
+
     nv: int
     ne: int
     nc: int
@@ -38,57 +33,53 @@ class Grid:
     v_grf: np.ndarray
     e_grf: np.ndarray
     c_grf: np.ndarray
-    ncf: nc.Dataset
+
+    @staticmethod
+    def from_netCDF4(ncf) -> Grid:
+
+        def get_dim(name) -> int:
+            return ncf.dimensions[name].size
+
+        def get_var(name) -> np.ndarray:
+            return np.array(ncf.variables[name][:].T)
+
+        return Grid(
+            nv=get_dim("vertex"),
+            ne=get_dim("edge"),
+            nc=get_dim("cell"),
+            c_lon_lat=np.stack((get_var("clon"), get_var("clat")), axis=1),
+            v_lon_lat=np.stack((get_var("vlon"), get_var("vlat")), axis=1),
+            e_lon_lat=np.stack((get_var("elon"), get_var("elat")), axis=1),
+            v2e=get_var("edges_of_vertex") - 1,
+            v2c=get_var("cells_of_vertex") - 1,
+            e2c=get_var("adjacent_cell_of_edge") - 1,
+            e2v=get_var("edge_vertices") - 1,
+            c2e=get_var("edge_of_cell") - 1,
+            c2v=get_var("vertex_of_cell") - 1,
+            v_grf=np.concatenate((get_var("start_idx_v"), get_var("end_idx_v")), axis=1) - 1,
+            e_grf=np.concatenate((get_var("start_idx_e"), get_var("end_idx_e")), axis=1) - 1,
+            c_grf=np.concatenate((get_var("start_idx_c"), get_var("end_idx_c")), axis=1) - 1,
+        )
 
 
-def load(fpath, mode="r") -> Grid:
-    ncf = nc.Dataset(fpath, mode)
+def store(self) -> None:
+    #FIXME: adjust for `netCDF4.Dataset`
+    # assume that the grid file was opened with a write mode
 
-    get_var = lambda name: np.array(ncf.variables[name][:].T)
-    #def get_var(name):
-    #    if name not in ncf.variables:
-    #        print(f"Gridfile '{fpath}' is missing variable '{name}' (skipping)!")
-    #        return np.zeros((1, 1))
-    #    return np.array(ncf.variables[name][:].T)
-    get_dim = lambda name: ncf.dimensions[name].size
+    self._ncf.variables["vlon"][:] = self.v_lon_lat[:, 0]
+    self._ncf.variables["vlat"][:] = self.v_lon_lat[:, 1]
+    self._ncf.variables["elon"][:] = self.e_lon_lat[:, 0]
+    self._ncf.variables["elat"][:] = self.e_lon_lat[:, 1]
+    self._ncf.variables["clon"][:] = self.c_lon_lat[:, 0]
+    self._ncf.variables["clat"][:] = self.c_lon_lat[:, 1]
+    self._ncf.variables["edges_of_vertex"][:] = self.v2e.T + 1
+    self._ncf.variables["cells_of_vertex"][:] = self.v2c.T + 1
+    self._ncf.variables["adjacent_cell_of_edge"][:] = self.e2c.T + 1
+    self._ncf.variables["edge_vertices"][:] = self.e2v.T + 1
+    self._ncf.variables["edge_of_cell"][:] = self.c2e.T + 1
+    self._ncf.variables["vertex_of_cell"][:] = self.c2v.T + 1
 
-    return Grid(
-        nv=get_dim("vertex"),
-        ne=get_dim("edge"),
-        nc=get_dim("cell"),
-        c_lon_lat=np.stack((get_var("clon"), get_var("clat")), axis=1),
-        v_lon_lat=np.stack((get_var("vlon"), get_var("vlat")), axis=1),
-        e_lon_lat=np.stack((get_var("elon"), get_var("elat")), axis=1),
-        v2e=get_var("edges_of_vertex") - 1,
-        v2c=get_var("cells_of_vertex") - 1,
-        e2c=get_var("adjacent_cell_of_edge") - 1,
-        e2v=get_var("edge_vertices") - 1,
-        c2e=get_var("edge_of_cell") - 1,
-        c2v=get_var("vertex_of_cell") - 1,
-        v_grf=np.concatenate((get_var("start_idx_v"), get_var("end_idx_v")), axis=1) - 1,
-        e_grf=np.concatenate((get_var("start_idx_e"), get_var("end_idx_e")), axis=1) - 1,
-        c_grf=np.concatenate((get_var("start_idx_c"), get_var("end_idx_c")), axis=1) - 1,
-        ncf=ncf,
-    )
-
-
-def store(grid: Grid) -> None:
-    ncf = grid.ncf
-
-    ncf.variables["vlon"][:] = grid.v_lon_lat[:, 0]
-    ncf.variables["vlat"][:] = grid.v_lon_lat[:, 1]
-    ncf.variables["elon"][:] = grid.e_lon_lat[:, 0]
-    ncf.variables["elat"][:] = grid.e_lon_lat[:, 1]
-    ncf.variables["clon"][:] = grid.c_lon_lat[:, 0]
-    ncf.variables["clat"][:] = grid.c_lon_lat[:, 1]
-    ncf.variables["edges_of_vertex"][:] = grid.v2e.T + 1
-    ncf.variables["cells_of_vertex"][:] = grid.v2c.T + 1
-    ncf.variables["adjacent_cell_of_edge"][:] = grid.e2c.T + 1
-    ncf.variables["edge_vertices"][:] = grid.e2v.T + 1
-    ncf.variables["edge_of_cell"][:] = grid.c2e.T + 1
-    ncf.variables["vertex_of_cell"][:] = grid.c2v.T + 1
-
-    ncf.sync()
+    self._ncf.sync()
 
 
 def order_around(center, points):
@@ -454,12 +445,12 @@ def argsort(mapping, cmp):
 
 
 def main():
-    grid = load("grid.nc")
-    parent_grid = load("grid.parent.nc")
+    grid = Grid.from_netCDF4(netCDF4.Dataset("grid.nc"))
+    parent_grid = Grid.from_netCDF4(netCDF4.Dataset("grid.parent.nc"))
 
     grid_modified = None
-    #grid = grid_modified = load("grid.benchmark.row-major.nc", "r+")
-    #grid = load("grid.benchmark.row-major.nc", "r+")
+    #grid = grid_modified = Grid.from_netCDF4(netCDF4.Dataset("grid.benchmark.row-major.nc", "r+"))
+    #grid = Grid.from_netCDF4(netCDF4.Dataset("grid.benchmark.row-major.nc", "r+"))
 
     # the line we want to align horizontally for this particular grid
     # the line for one of the upper rows
@@ -574,14 +565,14 @@ def main():
     grid.c2v = np.sort(grid.c2v)
     grid.c2e = np.sort(grid.c2e)
 
-    #grid = load("./lateral_boundary.grid.nc")
+    #grid = Grid.from_netCDF4(netCDF4.Dataset("./lateral_boundary.grid.nc"))
 
     fig, ax = plt.subplots()
 
     take_branch = 'c'
 
     if 'v' == take_branch:
-        #vertices = plot_vertices(ax, grid, field=grid.ncf.variables["parent_vertex_index"][:][v_perm])
+        #vertices = plot_vertices(ax, grid, field=grid._ncf.variables["parent_vertex_index"][:][v_perm])
         vertices = plot_vertices(ax, grid, field=np.arange(grid.nv))
         #vertices = plot_vertices(ax, grid, field=v_grf)
 
@@ -590,7 +581,7 @@ def main():
         fig.colorbar(vertices, ax=ax)
 
     elif 'e' == take_branch:
-        #edges = plot_edges(ax, grid, field=grid.ncf.variables["parent_edge_index"][:][e_perm])
+        #edges = plot_edges(ax, grid, field=grid._ncf.variables["parent_edge_index"][:][e_perm])
         edges = plot_edges(ax, grid, field=np.arange(grid.ne))
         #edges = plot_edges(ax, grid, field=e_grf)
 
@@ -599,7 +590,7 @@ def main():
         fig.colorbar(edges, ax=ax)
 
     elif 'c' == take_branch:
-        #cells = plot_cells(ax, grid, field=grid.ncf.variables["parent_cell_index"][:][c_perm])
+        #cells = plot_cells(ax, grid, field=grid._ncf.variables["parent_cell_index"][:][c_perm])
         cells = plot_cells(ax, grid, field=np.arange(grid.nc))
         #cells = plot_cells(ax, grid, field=c_grf)
 
@@ -617,7 +608,8 @@ def main():
     #ax.plot(grid.c_lon_lat[c_compute_domain_start:, 0], grid.c_lon_lat[c_compute_domain_start:, 1], 'o-')
 
     if grid_modified is not None:
-        store(grid_modified)
+        # FIXME: adjust to new _model_
+        grid_modified.store()
 
     ax.autoscale()
     plt.show()
