@@ -1,7 +1,12 @@
 #!/usr/bin/env python
 from __future__ import annotations
+import typing
+
 from functools import cmp_to_key
+import enum
 import dataclasses
+import os
+import shutil
 import numpy as np
 from matplotlib import (
     pyplot as plt,
@@ -52,8 +57,8 @@ class Grid:
             e_lon_lat=np.stack((get_var("elon"), get_var("elat")), axis=1),
             v2e=get_var("edges_of_vertex") - 1,
             v2c=get_var("cells_of_vertex") - 1,
-            e2c=get_var("adjacent_cell_of_edge") - 1,
             e2v=get_var("edge_vertices") - 1,
+            e2c=get_var("adjacent_cell_of_edge") - 1,
             c2e=get_var("edge_of_cell") - 1,
             c2v=get_var("vertex_of_cell") - 1,
             v_grf=np.concatenate((get_var("start_idx_v"), get_var("end_idx_v")), axis=1) - 1,
@@ -62,24 +67,99 @@ class Grid:
         )
 
 
-def store(self) -> None:
-    #FIXME: adjust for `netCDF4.Dataset`
-    # assume that the grid file was opened with a write mode
+class LocationType(enum.Enum):
+    Vertex = enum.auto()
+    Edge = enum.auto()
+    Cell = enum.auto()
 
-    self._ncf.variables["vlon"][:] = self.v_lon_lat[:, 0]
-    self._ncf.variables["vlat"][:] = self.v_lon_lat[:, 1]
-    self._ncf.variables["elon"][:] = self.e_lon_lat[:, 0]
-    self._ncf.variables["elat"][:] = self.e_lon_lat[:, 1]
-    self._ncf.variables["clon"][:] = self.c_lon_lat[:, 0]
-    self._ncf.variables["clat"][:] = self.c_lon_lat[:, 1]
-    self._ncf.variables["edges_of_vertex"][:] = self.v2e.T + 1
-    self._ncf.variables["cells_of_vertex"][:] = self.v2c.T + 1
-    self._ncf.variables["adjacent_cell_of_edge"][:] = self.e2c.T + 1
-    self._ncf.variables["edge_vertices"][:] = self.e2v.T + 1
-    self._ncf.variables["edge_of_cell"][:] = self.c2e.T + 1
-    self._ncf.variables["vertex_of_cell"][:] = self.c2v.T + 1
 
-    self._ncf.sync()
+@dataclasses.dataclass
+class FieldDescriptor:
+    location_type: typing.Optional[LocationType] = None
+    indexes_into: typing.Optional[LocationType] = None
+
+
+GridScheme = typing.Dict[str, FieldDescriptor]
+def make_schema(**fields: FieldDescriptor) -> GridScheme:
+    return fields
+
+
+ICON_grid_schema = make_schema(
+    vlon=FieldDescriptor(
+        location_type=LocationType.Vertex
+    ),
+    vlat=FieldDescriptor(
+        location_type=LocationType.Vertex
+    ),
+    # v2e
+    edges_of_vertex=FieldDescriptor(
+        location_type=LocationType.Vertex, indexes_into=LocationType.Edge
+    ),
+    # v2c
+    cells_of_vertex=FieldDescriptor(
+        location_type=LocationType.Vertex, indexes_into=LocationType.Cell
+    ),
+    elon=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+    elat=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+    # e2v
+    edge_vertices=FieldDescriptor(
+        location_type=LocationType.Edge, indexes_into=LocationType.Vertex
+    ),
+    # e2c
+    adjacent_cell_of_edge=FieldDescriptor(
+        location_type=LocationType.Edge, indexes_into=LocationType.Cell
+    ),
+    clon=FieldDescriptor(
+        location_type=LocationType.Cell
+    ),
+    clat=FieldDescriptor(
+        location_type=LocationType.Cell
+    ),
+    # c2e
+    edge_of_cell=FieldDescriptor(
+        location_type=LocationType.Cell, indexes_into=LocationType.Edge
+    ),
+    # c2v
+    vertex_of_cell=FieldDescriptor(
+        location_type=LocationType.Cell, indexes_into=LocationType.Vertex
+    ),
+    #FIXME: add other fields
+)
+
+
+def apply_permutation(
+    ncf,
+    perm: np.ndarray,
+    schema: GridScheme,
+    location_type: LocationType
+) -> None:
+    rev_perm = revert_permutation(perm)
+
+    for field_name, descr in schema.items():
+
+        field = ncf.variables[field_name]
+        array = np.copy(field[:])
+
+        if descr.location_type is location_type:
+            # we assume that the last axis needs to be reordered
+            array = array[..., perm]
+
+        if descr.indexes_into is location_type:
+            # go from fortran's 1-based indexing to python's 0-based indexing
+            array = array - 1
+
+            # remap indices
+            missing_values = array == DEVICE_MISSING_VALUE
+            array = rev_perm[array]
+            array[missing_values] = DEVICE_MISSING_VALUE
+
+            array = array + 1
+
+        field[:] = array
 
 
 def order_around(center, points):
@@ -101,7 +181,7 @@ def plot_cells(ax, grid: Grid, field=None):
         vs = grid.v_lon_lat[vs]
         triangles.append(patches.Polygon(vs))
 
-    collection = collections.PatchCollection(triangles, edgecolors="black")
+    collection = collections.PatchCollection(triangles)
     collection.set_array(field)
     ax.add_collection(collection)
 
@@ -134,7 +214,7 @@ def plot_vertices(ax, grid: Grid, field=None):
 
         hexagons.append(patches.Polygon(points))
 
-    collection = collections.PatchCollection(hexagons, edgecolors="black")
+    collection = collections.PatchCollection(hexagons)
     collection.set_array(field)
     ax.add_collection(collection)
 
@@ -163,22 +243,27 @@ def plot_edges(ax, grid: Grid, field=None):
         points = order_around(grid.e_lon_lat[ei].reshape(1, 2), points)
         diamonds.append(patches.Polygon(points))
 
-    collection = collections.PatchCollection(diamonds, edgecolors="black")
+    collection = collections.PatchCollection(diamonds)
     collection.set_array(field)
     ax.add_collection(collection)
 
     return collection
 
 
-def get_grf_regions(grid: Grid, location_type: str = 'c'):
+def get_grf_ranges(grid: Grid, location_type: LocationType = LocationType.Cell):
 
-    if location_type == 'v':
+    # returns the index ranges of the grid refinement valid_regions
+    # region 0 is the compute domain.
+    # all other regions are the lateral boundary layers starting from most outer
+    # and going to most inner.
+
+    if location_type is LocationType.Vertex:
         n = grid.nv
         start, end = grid.v_grf[:, 0], grid.v_grf[:, 1]
-    elif location_type == 'e':
+    elif location_type is LocationType.Edge:
         n = grid.ne
         start, end = grid.e_grf[:, 0], grid.e_grf[:, 1]
-    elif location_type == 'c':
+    elif location_type is LocationType.Cell:
         n = grid.nc
         start, end = grid.c_grf[:, 0], grid.c_grf[:, 1]
     else:
@@ -187,22 +272,23 @@ def get_grf_regions(grid: Grid, location_type: str = 'c'):
     valid_regions = start <= end
     start = start[valid_regions]
     end = end[valid_regions]
+    end = end + 1  # end is exclusive
 
     assert np.min(start) == 0
-    assert np.max(end) < n
+    assert np.max(end) <= n
 
     # There's something very weird going on:
     # Some few vertices/edges/cells (at the end) aren't in any valid region,
     # but without them, there will be a hole in the compute domain.
     # We fix this by assigning them to region `0` by default.
 
-    field = np.zeros(n)
-    region = 0
-    for s, e in zip(start, end):
-        field[s:e + 1] = region
-        region += 1
+    end[0] = n
 
-    return field
+    return list(zip(start, end))
+
+
+def range_to_slice(range: typing.Tuple[typing.Optional[int], typing.Optional[int]]):
+    return slice(range[0], range[1])
 
 
 def normalize_angle(angle):
@@ -223,13 +309,6 @@ def rotate(points, angle, origin=np.array([[0, 0]])):
     return points + origin
 
 
-def apply_perms(fields, perms):
-
-    for perm in perms:
-        for field in fields:
-            field[:] = field[perm, :]
-
-
 class UnsupportedPentagonException(Exception):
     pass
 
@@ -237,9 +316,7 @@ class UnsupportedPentagonException(Exception):
 def neighbor_array_to_set(array):
     nbhs = np.unique(array)
     return nbhs[nbhs != DEVICE_MISSING_VALUE]
-    #neighbors = set(array.flatten())
-    #neighbors.discard(DEVICE_MISSING_VALUE)  # ignore invalid neighbors
-    #return neighbors
+
 
 ###############################################################################
 # Each vertex is the crossing point of 6 rays. Two of twos rays are defined as
@@ -345,12 +422,19 @@ structured_v2c_offsets = np.array([
 ], dtype=int)
 
 
-def order_structured(
+@dataclasses.dataclass
+class GridMapping:
+    vertex_mapping: np.ndarray
+    edge_mapping: np.ndarray
+    cell_mapping: np.ndarray
+
+
+def create_structured_grid_mapping(
     grid: Grid,
     right_direction_angle,
     start_vertex=None,
     angle_threshold=np.deg2rad(30)
-):
+) -> GridMapping:
     # doesn't support pentagons!
 
     if start_vertex is None:
@@ -365,15 +449,28 @@ def order_structured(
 
     vertex_mapping[start_vertex] = [0, 0]
 
+    # This algorithms works as follows:
+    #
+    # * Carry out a breadth-first search starting from `start_vertex`.
+    # * For each vertex:
+    #   * Determine for each neighbor edge, cell, vertex what is their relative id.
+    #     (see `structured_<...>_offsets`)
+    #   * For each neighbor edge, cell, vertex check which ones have no coordinates assigned yet:
+    #     * Assign new coordinates to neighbors if they don't have coordinates yet.
+    #     * Check if coordinates are consistent if they already have coordinates.
+    #   * Update the right direction angle based on the neighboring vertices of the vertex
+    #     (this way the algorithm can handle a small local curvature)
+    #   * Continue the bsf with the vertices that have newly assigned coordinates.
+
     def bfs(vertex_id, right_direction_angle):
 
+        # neighbor cells, edges, vertices
         cell_ids = neighbor_array_to_set(grid.v2c[vertex_id])
         edge_ids = neighbor_array_to_set(grid.v2e[vertex_id])
         vertex_ids = neighbor_array_to_set(grid.e2v[edge_ids])
-        #vertex_ids.discard(vertex_id)
         vertex_ids = vertex_ids[vertex_ids != vertex_id]
-        #vertex_ids = list(vertex_ids)
 
+        # some sanity checks
         if len(edge_ids) == 5 and len(cell_ids) == 5:
             raise UnsupportedPentagonException
 
@@ -381,42 +478,54 @@ def order_structured(
         assert len(vertex_ids) == len(edge_ids)
         assert 0 < len(cell_ids) <= len(edge_ids) <= 6
 
+        # get the coordinates of this vertex
         x, y = vertex_mapping[vertex_id]
 
         assert not np.isnan(x) and not np.isnan(y)
 
         self_lon_lat = grid.v_lon_lat[vertex_id]
 
-        vertices_angle = np.fmod(get_angle(grid.v_lon_lat[vertex_ids] - self_lon_lat) - right_direction_angle, np.pi*2)
+        # compute angles of neighbor vertices
+        vertices_angle = normalize_angle(get_angle(grid.v_lon_lat[vertex_ids] - self_lon_lat) - right_direction_angle)
         vertices_nbh_ids = np.around(vertices_angle/(np.pi/3)).astype(int)
         assert np.all(np.fabs(vertices_angle - vertices_nbh_ids*np.pi/3) <= angle_threshold)
 
-        edges_angle = np.fmod(get_angle(grid.e_lon_lat[edge_ids] - self_lon_lat) - right_direction_angle, np.pi*2)
+        # compute angles of neighbor edges
+        edges_angle = normalize_angle(get_angle(grid.e_lon_lat[edge_ids] - self_lon_lat) - right_direction_angle)
         edges_nbh_ids = np.around(edges_angle/(np.pi/3)).astype(int)
         assert np.all(np.fabs(edges_angle - edges_nbh_ids*np.pi/3) <= angle_threshold)
 
-        cells_angle = np.fmod(get_angle(grid.c_lon_lat[cell_ids] - self_lon_lat) - right_direction_angle - np.pi/6, np.pi*2)
+        # compute angles of neighbor cells
+        cells_angle = normalize_angle(get_angle(grid.c_lon_lat[cell_ids] - self_lon_lat) - right_direction_angle - np.pi/6)
         cells_nbh_ids = np.around(cells_angle/(np.pi/3)).astype(int)
         assert np.all(np.fabs(cells_angle - cells_nbh_ids*np.pi/3) <= angle_threshold)
 
+        # update right direction angle
         self_right_direction_angle = np.average(vertices_angle - vertices_nbh_ids*np.pi/3) + right_direction_angle
 
+        # assign coordinates to vertex neighbors that don't have a coordinate yet
         vertices_nbh_structured_coords = structured_v2v_offsets[vertices_nbh_ids] + np.array([[x, y]], dtype=int)
         new_vertex_ids = np.all(np.isnan(vertex_mapping[vertex_ids, :]), axis=-1)
         vertex_mapping[vertex_ids[new_vertex_ids], :] = vertices_nbh_structured_coords[new_vertex_ids]
+        # check vertex neighbors that already had a coordinate, that they are consistent with the ones we computed here
         assert np.all(vertex_mapping[vertex_ids, :] == vertices_nbh_structured_coords)
 
-        # FIXME: updated mappings also for edges & cells
+        # assign coordinates to edge neighbors that don't have a coordinate yet
         edges_nbh_structured_coords = structured_v2e_offsets[edges_nbh_ids] + np.array([[x, y, 0]], dtype=int)
         new_edge_ids = np.all(np.isnan(edge_mapping[edge_ids, :]), axis=-1)
         edge_mapping[edge_ids[new_edge_ids], :] = edges_nbh_structured_coords[new_edge_ids]
+        # check edge neighbors that already had a coordinate, that they are consistent with the ones we computed here
         assert np.all(edge_mapping[edge_ids, :] == edges_nbh_structured_coords)
 
+        # assign coordinates to cell neighbors that don't have a coordinate yet
         cells_nbh_structured_coords = structured_v2c_offsets[cells_nbh_ids] + np.array([[x, y, 0]], dtype=int)
         new_cell_ids = np.all(np.isnan(cell_mapping[cell_ids, :]), axis=-1)
         cell_mapping[cell_ids[new_cell_ids], :] = cells_nbh_structured_coords[new_cell_ids]
+        # check cell neighbors that already had a coordinate, that they are consistent with the ones we computed here
         assert np.all(cell_mapping[cell_ids, :] == cells_nbh_structured_coords)
 
+        # continue bfs with vertices that have newly assigned coordinates
+        # (use the updated right direction angle for them)
         return {(int(next_vertex_id), self_right_direction_angle) for next_vertex_id in vertex_ids[new_vertex_ids]}
 
     current = set()
@@ -434,182 +543,161 @@ def order_structured(
     assert not np.any(np.isnan(edge_mapping))
     assert not np.any(np.isnan(cell_mapping))
 
-    return vertex_mapping, edge_mapping, cell_mapping
+    return GridMapping(
+        vertex_mapping=vertex_mapping,
+        edge_mapping=edge_mapping,
+        cell_mapping=cell_mapping,
+    )
 
 
-def argsort(mapping, cmp):
-    ids = list(range(mapping.shape[0]))
+def argsort_simple(
+    mapping: np.ndarray,
+    cmp: typing.Callable[[typing.Any, typing.Any], int],
+    idx_range: typing.Tuple[typing.Optional[int], typing.Optional[int]] = (None, None),
+) -> np.ndarray:
+    # Sorts the first axis based on a `cmp` function within the range [start_idx:end_idx].
+    # Returns the permutation array for the whole array.
+    #
+    # A permutation is an array `a` such that: `a[old_index] == new_index`
+
+    total_end_idx = mapping.shape[0]
+    start_idx, end_idx = idx_range
+
+    if start_idx is None:
+        start_idx = 0
+
+    if end_idx is None:
+        end_idx = total_end_idx
+
+    ids = list(range(start_idx, end_idx))
     ids.sort(key=cmp_to_key(lambda a, b: cmp(mapping[a, :], mapping[b, :])))
-    return np.array(ids)
+    return np.concatenate((np.arange(start_idx), np.array(ids), np.arange(end_idx, total_end_idx)))
 
 
+def revert_permutation(perm: np.ndarray) -> np.ndarray:
+    perm_rev = np.arange(perm.shape[0])
+    perm_rev[perm] = np.copy(perm_rev)
+    return perm_rev
 
-def main():
-    grid = Grid.from_netCDF4(netCDF4.Dataset("grid.nc"))
-    parent_grid = Grid.from_netCDF4(netCDF4.Dataset("grid.parent.nc"))
 
-    grid_modified = None
-    #grid = grid_modified = Grid.from_netCDF4(netCDF4.Dataset("grid.benchmark.row-major.nc", "r+"))
-    #grid = Grid.from_netCDF4(netCDF4.Dataset("grid.benchmark.row-major.nc", "r+"))
+class SimpleRowMajorSorting:
+    # Provides comparison functions for mappings from `create_structured_grid_mapping`.
 
-    # the line we want to align horizontally for this particular grid
-    # the line for one of the upper rows
-    p1 = np.array([[0.098574, 0.8372010]])
-    p2 = np.array([[0.187451, 0.8316751]])
-    angle = np.squeeze(get_angle(p2 - p1))
+    @staticmethod
+    def vertex_compare(a, b) -> int:
+        return a[0] - b[0] if b[1] == a[1] else b[1] - a[1]
 
-    origin = np.min(grid.v_lon_lat, axis=0)
-
-    grid.v_lon_lat = rotate(grid.v_lon_lat, -angle, origin = origin)
-    grid.e_lon_lat = rotate(grid.e_lon_lat, -angle, origin = origin)
-    grid.c_lon_lat = rotate(grid.c_lon_lat, -angle, origin = origin)
-
-    #v_perm1 = np.argsort(grid.v_lon_lat[:, 0])
-    #v_perm2 = np.argsort(grid.v_lon_lat[v_perm1, 1], kind='stable')
-
-    #e_perm1 = np.argsort(grid.e_lon_lat[:, 0])
-    #e_perm2 = np.argsort(grid.e_lon_lat[e_perm1, 1], kind='stable')
-
-    #c_perm1 = np.argsort(grid.c_lon_lat[:, 0])
-    #c_perm2 = np.argsort(grid.c_lon_lat[c_perm1, 1], kind='stable')
-
-    #apply_perms((grid.v_lon_lat, grid.v2e, grid.v2c), (v_perm1, v_perm2))
-    #apply_perms((grid.e_lon_lat, grid.e2v, grid.e2c), (e_perm1, e_perm2))
-    #apply_perms((grid.c_lon_lat, grid.c2v, grid.c2e), (c_perm1, c_perm2))
-
-    # the line of the right direction angle for vertex #0:
-    p1 = np.array([[0.18511014, 0.79054856]])
-    p2 = np.array([[0.18593181, 0.79048109]])
-    angle = np.squeeze(get_angle(p2 - p1))
-
-    vertex_mapping, edge_mapping, cell_mapping = order_structured(grid, angle, angle_threshold=np.deg2rad(15))
-
-    v_grf = get_grf_regions(grid, "v")
-    v_compute_domain = np.nonzero(v_grf == 0)
-    v_compute_domain_start = np.min(v_compute_domain)
-    v_compute_domain_end = np.max(v_compute_domain) + 1
-    assert v_compute_domain_end == grid.nv
-
-    e_grf = get_grf_regions(grid, "e")
-    e_compute_domain = np.nonzero(e_grf == 0)
-    e_compute_domain_start = np.min(e_compute_domain)
-    e_compute_domain_end = np.max(e_compute_domain) + 1
-    assert e_compute_domain_end == grid.ne
-
-    c_grf = get_grf_regions(grid, "c")
-    c_compute_domain = np.nonzero(c_grf == 0)
-    c_compute_domain_start = np.min(c_compute_domain)
-    c_compute_domain_end = np.max(c_compute_domain) + 1
-    assert c_compute_domain_end == grid.nc
-
-    v_perm = argsort(vertex_mapping[v_compute_domain_start:v_compute_domain_end], lambda a, b: a[0] - b[0] if b[1] == a[1] else b[1] - a[1])
-    v_perm = np.concatenate((np.arange(v_compute_domain_start), v_perm + v_compute_domain_start))
-    v_perm_rev = np.arange(grid.nv)
-    v_perm_rev[v_perm] = np.copy(v_perm_rev)
-
-    #e_perm = argsort(edge_mapping, lambda a, b: (a[2] - b[2] if a[0] == b[0] else a[0] - b[0]) if b[1] == a[1] else b[1] - a[1])
-    def e_cmp(a, b):
+    @staticmethod
+    def edge_compare(a, b) -> int:
         if a[2] == 2 and b[2] != 2:
             return b[1] - a[1] + 1/2
         if a[2] != 2 and b[2] == 2:
             return b[1] - a[1] - 1/2
         return (a[2] - b[2] if a[0] == b[0] else a[0] - b[0]) if b[1] == a[1] else b[1] - a[1]
-    e_perm = argsort(edge_mapping[e_compute_domain_start:e_compute_domain_end], e_cmp)
-    e_perm = np.concatenate((np.arange(e_compute_domain_start), e_perm + e_compute_domain_start))
-    e_perm_rev = np.arange(grid.ne)
-    e_perm_rev[e_perm] = np.copy(e_perm_rev)
 
-    c_perm = argsort(cell_mapping[c_compute_domain_start:c_compute_domain_end], lambda a, b: (a[2] - b[2] if a[0] == b[0] else a[0] - b[0]) if b[1] == a[1] else b[1] - a[1])
-    c_perm = np.concatenate((np.arange(c_compute_domain_start), c_perm + c_compute_domain_start))
-    c_perm_rev = np.arange(grid.nc)
-    c_perm_rev[c_perm] = np.copy(c_perm_rev)
+    @staticmethod
+    def cell_compare(a, b) -> int:
+        return (a[2] - b[2] if a[0] == b[0] else a[0] - b[0]) if b[1] == a[1] else b[1] - a[1]
 
-    # reorder vertex fields
-    apply_perms((grid.v_lon_lat, grid.v2e, grid.v2c), (v_perm,))
-    # fix the indices of the neighbor tables
-    v2e_missing_values = grid.v2e == DEVICE_MISSING_VALUE
-    grid.v2e = e_perm_rev[grid.v2e]
-    grid.v2e[v2e_missing_values] = DEVICE_MISSING_VALUE
-    # fix the indices of the neighbor tables
-    v2c_missing_values = grid.v2c == DEVICE_MISSING_VALUE
-    grid.v2c = c_perm_rev[grid.v2c]
-    grid.v2c[v2c_missing_values] = DEVICE_MISSING_VALUE
-    # sort the neighbors to improve coalescing in the neighbor tables
-    grid.v2e[grid.v2e == DEVICE_MISSING_VALUE] = grid.ne + 1
-    grid.v2e = np.sort(grid.v2e)
-    grid.v2e[grid.v2e == grid.ne + 1] = DEVICE_MISSING_VALUE
-    grid.v2c[grid.v2c == DEVICE_MISSING_VALUE] = grid.nc + 1
-    grid.v2c = np.sort(grid.v2c)
-    grid.v2c[grid.v2c == grid.nc + 1] = DEVICE_MISSING_VALUE
 
-    # reorder edge fields
-    apply_perms((grid.e_lon_lat, grid.e2v, grid.e2c), (e_perm,))
-    # fix the indices of the neighbor tables (edges never have missing cells)
-    grid.e2v = v_perm_rev[grid.e2v]
-    # fix the indices of the neighbor tables
-    e2c_missing_values = grid.e2c == DEVICE_MISSING_VALUE
-    grid.e2c = c_perm_rev[grid.e2c]
-    grid.e2c[e2c_missing_values] = DEVICE_MISSING_VALUE
-    # sort the neighbors to improve coalescing in the neighbor tables
-    grid.e2v = np.sort(grid.e2v)
-    grid.e2c[grid.e2c == DEVICE_MISSING_VALUE] = grid.nc + 1
-    grid.e2c = np.sort(grid.e2c)
-    grid.e2c[grid.e2c == grid.nc + 1] = DEVICE_MISSING_VALUE
+TEMP_FILE_NAME = "./temp.nc"
 
-    # reorder cell fields
-    apply_perms((grid.c_lon_lat, grid.c2v, grid.c2e), (c_perm,))
-    # fix the indices of the neighbor tables (cells never have missing values)
-    grid.c2v = v_perm_rev[grid.c2v]
-    grid.c2e = e_perm_rev[grid.c2e]
-    # sort the neighbors to improve coalescing in the neighbor tables
-    grid.c2v = np.sort(grid.c2v)
-    grid.c2e = np.sort(grid.c2e)
 
-    #grid = Grid.from_netCDF4(netCDF4.Dataset("./lateral_boundary.grid.nc"))
+def main():
+    grid_file = netCDF4.Dataset("grid.nc")
+    grid = Grid.from_netCDF4(grid_file)
+    parent_grid_file = netCDF4.Dataset("grid.parent.nc")
+    parent_grid = Grid.from_netCDF4(parent_grid_file)
+
+    write_back = False
+    if write_back:
+        shutil.copy("./grid.nc", "./grid.benchmark.row-major.nc")
+        grid_modified_file = netCDF4.Dataset("grid.benchmark.row-major.nc", "r+")
+    else:
+        # we don't want to write back, but we still want to be able to modify
+        # so we just use a temporary file that we can open in read/write mode
+        shutil.copy("./grid.nc", TEMP_FILE_NAME)
+        grid_modified_file = netCDF4.Dataset(TEMP_FILE_NAME, "r+")
+
+    # the line of the right direction angle for vertex #0:
+    p1 = np.array([[0.18511014, 0.79054856]])
+    p2 = np.array([[0.18593181, 0.79048109]])
+    right_direction_angle = np.squeeze(get_angle(p2 - p1))
+
+    mapping = create_structured_grid_mapping(grid, right_direction_angle, angle_threshold=np.deg2rad(15))
+
+    v_grf = get_grf_ranges(grid, LocationType.Vertex)
+    e_grf = get_grf_ranges(grid, LocationType.Edge)
+    c_grf = get_grf_ranges(grid, LocationType.Cell)
+
+    v_perm = argsort_simple(mapping.vertex_mapping, SimpleRowMajorSorting.vertex_compare, v_grf[0])
+    e_perm = argsort_simple(mapping.edge_mapping, SimpleRowMajorSorting.edge_compare, e_grf[0])
+    c_perm = argsort_simple(mapping.cell_mapping, SimpleRowMajorSorting.cell_compare, c_grf[0])
+
+    apply_permutation(grid_modified_file, c_perm, ICON_grid_schema, LocationType.Cell)
+    apply_permutation(grid_modified_file, e_perm, ICON_grid_schema, LocationType.Edge)
+    apply_permutation(grid_modified_file, v_perm, ICON_grid_schema, LocationType.Vertex)
+
+    #TODO: neighbor table sorting
+
+    ## sort the neighbors to improve coalescing in the neighbor tables
+    #grid.v2e[grid.v2e == DEVICE_MISSING_VALUE] = grid.ne + 1
+    #grid.v2e = np.sort(grid.v2e)
+    #grid.v2e[grid.v2e == grid.ne + 1] = DEVICE_MISSING_VALUE
+    #grid.v2c[grid.v2c == DEVICE_MISSING_VALUE] = grid.nc + 1
+    #grid.v2c = np.sort(grid.v2c)
+    #grid.v2c[grid.v2c == grid.nc + 1] = DEVICE_MISSING_VALUE
+
+    ## sort the neighbors to improve coalescing in the neighbor tables
+    ## (no `DEVICE_MISSING_VALUE` in this table)
+    #grid.e2v = np.sort(grid.e2v)
+    #grid.e2c[grid.e2c == DEVICE_MISSING_VALUE] = grid.nc + 1
+    #grid.e2c = np.sort(grid.e2c)
+    #grid.e2c[grid.e2c == grid.nc + 1] = DEVICE_MISSING_VALUE
+
+    ## sort the neighbors to improve coalescing in the neighbor tables
+    ## (no `DEVICE_MISSING_VALUE` in these tables)
+    #grid.c2v = np.sort(grid.c2v)
+    #grid.c2e = np.sort(grid.c2e)
+
+    # reload the grid after we've modified it
+    grid = Grid.from_netCDF4(grid_modified_file)
 
     fig, ax = plt.subplots()
 
-    take_branch = 'c'
+    take_branch: typing.Optional[LocationType] = LocationType.Cell
 
-    if 'v' == take_branch:
-        #vertices = plot_vertices(ax, grid, field=grid._ncf.variables["parent_vertex_index"][:][v_perm])
+    if take_branch is LocationType.Vertex:
         vertices = plot_vertices(ax, grid, field=np.arange(grid.nv))
-        #vertices = plot_vertices(ax, grid, field=v_grf)
-
         # transparent edges
         vertices.set_edgecolor((0, 0, 0, 0))
         fig.colorbar(vertices, ax=ax)
 
-    elif 'e' == take_branch:
-        #edges = plot_edges(ax, grid, field=grid._ncf.variables["parent_edge_index"][:][e_perm])
+    elif take_branch is LocationType.Edge:
         edges = plot_edges(ax, grid, field=np.arange(grid.ne))
-        #edges = plot_edges(ax, grid, field=e_grf)
-
         # transparent edges
         edges.set_edgecolor((0, 0, 0, 0))
         fig.colorbar(edges, ax=ax)
 
-    elif 'c' == take_branch:
-        #cells = plot_cells(ax, grid, field=grid._ncf.variables["parent_cell_index"][:][c_perm])
+    elif take_branch is LocationType.Cell:
         cells = plot_cells(ax, grid, field=np.arange(grid.nc))
-        #cells = plot_cells(ax, grid, field=c_grf)
-
         # transparent edges
         cells.set_edgecolor((0, 0, 0, 0))
         fig.colorbar(cells, ax=ax)
 
-    elif 'n' == take_branch:
-        pass # this is the plot none of the branch...
+    elif take_branch is None:
+        pass # this is the plot none branch
     else:
         assert False
 
-    #ax.plot(grid.v_lon_lat[v_compute_domain_start:, 0], grid.v_lon_lat[v_compute_domain_start:, 1], 'o-')
-    #ax.plot(grid.e_lon_lat[e_compute_domain_start:, 0], grid.e_lon_lat[e_compute_domain_start:, 1], 'o-')
-    #ax.plot(grid.c_lon_lat[c_compute_domain_start:, 0], grid.c_lon_lat[c_compute_domain_start:, 1], 'o-')
+    #ax.plot(grid.v_lon_lat[range_to_slice(v_grf[0]), 0], grid.v_lon_lat[range_to_slice(v_grf[0]), 1], 'o-')
+    #ax.plot(grid.e_lon_lat[range_to_slice(e_grf[0]), 0], grid.e_lon_lat[range_to_slice(e_grf[0]), 1], 'o-')
+    #ax.plot(grid.c_lon_lat[range_to_slice(c_grf[0]), 0], grid.c_lon_lat[range_to_slice(c_grf[0]), 1], 'o-')
 
-    if grid_modified is not None:
-        # FIXME: adjust to new _model_
-        grid_modified.store()
+    if write_back:
+        grid_modified_file.sync()
+    else:
+        os.remove(TEMP_FILE_NAME)
 
     ax.autoscale()
     plt.show()
