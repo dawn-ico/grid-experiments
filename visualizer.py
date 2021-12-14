@@ -59,8 +59,8 @@ class Grid:
             v2c=get_var("cells_of_vertex") - 1,
             e2v=get_var("edge_vertices") - 1,
             e2c=get_var("adjacent_cell_of_edge") - 1,
-            c2e=get_var("edge_of_cell") - 1,
             c2v=get_var("vertex_of_cell") - 1,
+            c2e=get_var("edge_of_cell") - 1,
             v_grf=np.concatenate((get_var("start_idx_v"), get_var("end_idx_v")), axis=1) - 1,
             e_grf=np.concatenate((get_var("start_idx_e"), get_var("end_idx_e")), axis=1) - 1,
             c_grf=np.concatenate((get_var("start_idx_c"), get_var("end_idx_c")), axis=1) - 1,
@@ -77,6 +77,10 @@ class LocationType(enum.Enum):
 class FieldDescriptor:
     location_type: typing.Optional[LocationType] = None
     indexes_into: typing.Optional[LocationType] = None
+    #FIXME: `primary_axis` is quite weird...
+    # some fields that have a `location_type` are transposed
+    # (only needed with `location_type` and if the field is more than one dimensional)
+    primary_axis: typing.Optional[int] = None
 
 
 GridScheme = typing.Dict[str, FieldDescriptor]
@@ -85,19 +89,33 @@ def make_schema(**fields: FieldDescriptor) -> GridScheme:
 
 
 ICON_grid_schema = make_schema(
+    #FIXME: make sure this is complete
+    ###########################################################################
+    # grid topology and lon/lat coordinates
+    ###########################################################################
     vlon=FieldDescriptor(
         location_type=LocationType.Vertex
     ),
     vlat=FieldDescriptor(
         location_type=LocationType.Vertex
     ),
+    # v2v
+    vertices_of_vertex=FieldDescriptor(
+        primary_axis=1,
+        location_type=LocationType.Vertex,
+        indexes_into=LocationType.Vertex,
+    ),
     # v2e
     edges_of_vertex=FieldDescriptor(
-        location_type=LocationType.Vertex, indexes_into=LocationType.Edge
+        primary_axis=1,
+        location_type=LocationType.Vertex,
+        indexes_into=LocationType.Edge,
     ),
     # v2c
     cells_of_vertex=FieldDescriptor(
-        location_type=LocationType.Vertex, indexes_into=LocationType.Cell
+        primary_axis=1,
+        location_type=LocationType.Vertex,
+        indexes_into=LocationType.Cell,
     ),
     elon=FieldDescriptor(
         location_type=LocationType.Edge
@@ -107,11 +125,15 @@ ICON_grid_schema = make_schema(
     ),
     # e2v
     edge_vertices=FieldDescriptor(
-        location_type=LocationType.Edge, indexes_into=LocationType.Vertex
+        primary_axis=1,
+        location_type=LocationType.Edge,
+        indexes_into=LocationType.Vertex,
     ),
     # e2c
     adjacent_cell_of_edge=FieldDescriptor(
-        location_type=LocationType.Edge, indexes_into=LocationType.Cell
+        primary_axis=1,
+        location_type=LocationType.Edge,
+        indexes_into=LocationType.Cell,
     ),
     clon=FieldDescriptor(
         location_type=LocationType.Cell
@@ -119,15 +141,155 @@ ICON_grid_schema = make_schema(
     clat=FieldDescriptor(
         location_type=LocationType.Cell
     ),
-    # c2e
-    edge_of_cell=FieldDescriptor(
-        location_type=LocationType.Cell, indexes_into=LocationType.Edge
-    ),
     # c2v
     vertex_of_cell=FieldDescriptor(
-        location_type=LocationType.Cell, indexes_into=LocationType.Vertex
+        primary_axis=1,
+        location_type=LocationType.Cell,
+        indexes_into=LocationType.Vertex,
     ),
-    #FIXME: add other fields
+    # c2e
+    edge_of_cell=FieldDescriptor(
+        primary_axis=1,
+        location_type=LocationType.Cell,
+        indexes_into=LocationType.Edge,
+    ),
+    # c2c
+    neighbor_cell_index=FieldDescriptor(
+        primary_axis=1,
+        location_type=LocationType.Cell,
+        indexes_into=LocationType.Cell,
+    ),
+    ###########################################################################
+    # other vertex fields
+    ###########################################################################
+    cartesian_x_vertices=FieldDescriptor(
+        location_type=LocationType.Vertex
+    ),
+    cartesian_y_vertices=FieldDescriptor(
+        location_type=LocationType.Vertex
+    ),
+    cartesian_z_vertices=FieldDescriptor(
+        location_type=LocationType.Vertex
+    ),
+    dual_area=FieldDescriptor(
+        location_type=LocationType.Vertex
+    ),
+    longitude_vertices=FieldDescriptor(
+        location_type=LocationType.Vertex
+    ),
+    latitude_vertices=FieldDescriptor(
+        location_type=LocationType.Vertex
+    ),
+    dual_area_p=FieldDescriptor(
+        location_type=LocationType.Vertex
+    ),
+    vlon_vertices=FieldDescriptor(
+        primary_axis=0,
+        location_type=LocationType.Vertex
+    ),
+    vlat_vertices=FieldDescriptor(
+        primary_axis=0,
+        location_type=LocationType.Vertex
+    ),
+    #FIXME: will this work just like this?
+    edge_orientation=FieldDescriptor(
+        primary_axis=1,
+        location_type=LocationType.Vertex
+    ),
+    refin_v_ctrl=FieldDescriptor(
+        location_type=LocationType.Vertex
+    ),
+    parent_vertex_index=FieldDescriptor(
+        location_type=LocationType.Vertex
+    ),
+    ###########################################################################
+    # other edge fields
+    ###########################################################################
+    lon_edge_centre=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+    lat_edge_centre=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+    edge_length=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+    edge_cell_distance=FieldDescriptor(
+        primary_axis=1,
+        location_type=LocationType.Edge
+    ),
+    dual_edge_length=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+    edge_vert_distance=FieldDescriptor(
+        primary_axis=1,
+        location_type=LocationType.Edge
+    ),
+    zonal_normal_primal_edge=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+    meridional_normal_primal_edge=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+    zonal_normal_dual_edge=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+    meridional_normal_dual_edge=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+    edge_system_orientation=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+    elon_vertices=FieldDescriptor(
+        primary_axis=0,
+        location_type=LocationType.Edge
+    ),
+    elat_vertices=FieldDescriptor(
+        primary_axis=0,
+        location_type=LocationType.Edge
+    ),
+    quadrilateral_area=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+    refin_e_ctrl=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+    parent_edge_index=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+    ###########################################################################
+    # other cell fields
+    ###########################################################################
+    cell_area=FieldDescriptor(
+        location_type=LocationType.Cell
+    ),
+    lon_cell_centre=FieldDescriptor(
+        location_type=LocationType.Cell
+    ),
+    lat_cell_centre=FieldDescriptor(
+        location_type=LocationType.Cell
+    ),
+    cell_area_p=FieldDescriptor(
+        location_type=LocationType.Cell
+    ),
+    orientation_of_normal=FieldDescriptor(
+        primary_axis=1,
+        location_type=LocationType.Cell
+    ),
+    clon_vertices=FieldDescriptor(
+        primary_axis=0,
+        location_type=LocationType.Cell,
+    ),
+    clat_vertices=FieldDescriptor(
+        primary_axis=0,
+        location_type=LocationType.Cell,
+    ),
+    parent_cell_index=FieldDescriptor(
+        location_type=LocationType.Cell
+    ),
+    refin_c_ctrl=FieldDescriptor(
+        location_type=LocationType.Cell
+    ),
 )
 
 
@@ -145,8 +307,11 @@ def apply_permutation(
         array = np.copy(field[:])
 
         if descr.location_type is location_type:
-            # we assume that the last axis needs to be reordered
-            array = array[..., perm]
+            if 1 < len(array.shape):
+                assert descr.primary_axis is not None
+                array = np.take(array, perm, axis=descr.primary_axis)
+            else:
+                array = array[perm]
 
         if descr.indexes_into is location_type:
             # go from fortran's 1-based indexing to python's 0-based indexing
@@ -496,6 +661,7 @@ def create_structured_grid_mapping(
         assert np.all(np.fabs(edges_angle - edges_nbh_ids*np.pi/3) <= angle_threshold)
 
         # compute angles of neighbor cells
+        # (we rotate the cells by 30 degrees clock-wise (`-np.pi/6`) to get the angle id)
         cells_angle = normalize_angle(get_angle(grid.c_lon_lat[cell_ids] - self_lon_lat) - right_direction_angle - np.pi/6)
         cells_nbh_ids = np.around(cells_angle/(np.pi/3)).astype(int)
         assert np.all(np.fabs(cells_angle - cells_nbh_ids*np.pi/3) <= angle_threshold)
@@ -609,6 +775,7 @@ def main():
     parent_grid_file = netCDF4.Dataset("grid.parent.nc")
     parent_grid = Grid.from_netCDF4(parent_grid_file)
 
+    #FIXME: we also have to adjust some things in ./lateral_boundary.grid.nc
     write_back = False
     if write_back:
         shutil.copy("./grid.nc", "./grid.benchmark.row-major.nc")
