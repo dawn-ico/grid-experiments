@@ -65,6 +65,33 @@ class Grid:
             e_grf=np.concatenate((get_var("start_idx_e"), get_var("end_idx_e")), axis=1) - 1,
             c_grf=np.concatenate((get_var("start_idx_c"), get_var("end_idx_c")), axis=1) - 1,
         )
+    
+    @staticmethod
+    def lat_from_netCDF4(ncf) -> Grid:
+
+        def get_dim(name) -> int:
+            return ncf.dimensions[name].size
+
+        def get_var(name) -> np.ndarray:
+            return np.array(ncf.variables[name][:].T)
+
+        return Grid(
+            nv=get_dim("vertex"),
+            ne=get_dim("edge"),
+            nc=get_dim("cell"),
+            c_lon_lat=np.stack((get_var("clon"), get_var("clat")), axis=1),
+            v_lon_lat=np.stack((get_var("vlon"), get_var("vlat")), axis=1),
+            e_lon_lat=np.stack((get_var("elon"), get_var("elat")), axis=1),
+            v2e=0,
+            v2c=get_var("cells_of_vertex") - 1,
+            e2v=get_var("edge_vertices") - 1,
+            e2c=get_var("adjacent_cell_of_edge") - 1,
+            c2v=get_var("vertex_of_cell") - 1,
+            c2e=0,
+            v_grf=0,
+            e_grf=0,
+            c_grf=0,
+        )
 
 
 class LocationType(enum.Enum):
@@ -292,6 +319,192 @@ ICON_grid_schema = make_schema(
     ),
 )
 
+ICON_grid_schema_lat = make_schema(
+  
+    # double clon(cell=9868);
+    #   :units = "radian";
+    #   :standard_name = "grid_longitude";
+    #   :bounds = "clon_vertices";
+    clon=FieldDescriptor(
+        location_type=LocationType.Cell
+    ),
+
+    # double clat(cell=9868);
+    #   :units = "radian";
+    #   :standard_name = "grid_latitude";
+    #   :bounds = "clat_vertices";
+    clat=FieldDescriptor(
+        location_type=LocationType.Cell
+    ),
+
+    # double vlon(vertex=5287);
+    #   :units = "radian";
+    #   :standard_name = "grid_longitude";
+    #   :bounds = "vlon_vertices";
+    vlon=FieldDescriptor(
+        location_type=LocationType.Vertex
+    ),
+
+    # double vlat(vertex=5287);
+    #   :units = "radian";
+    #   :standard_name = "grid_latitude";
+    #   :bounds = "vlat_vertices";
+    vlat=FieldDescriptor(
+        location_type=LocationType.Vertex
+    ),
+
+    # double elon(edge=15155);
+    #   :units = "radian";
+    #   :standard_name = "grid_longitude";
+    #   :bounds = "elon_vertices";
+    elon=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+
+    # double elat(edge=15155);
+    #   :units = "radian";
+    #   :standard_name = "grid_latitude";
+    #   :bounds = "elat_vertices";
+    elat=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+
+    # double longitude_vertices(vertex=5287);
+    #   :coordinates = "vlon vlat";
+    longitude_vertices=FieldDescriptor(
+        location_type=LocationType.Vertex
+    ),
+
+
+    # double latitude_vertices(vertex=5287);
+    #   :coordinates = "vlon vlat";
+    latitude_vertices=FieldDescriptor(
+        location_type=LocationType.Vertex
+    ),
+
+    # double clon_vertices(cell=9868, nv=3);
+    clon_vertices=FieldDescriptor(
+        primary_axis=0,
+        location_type=LocationType.Cell,
+    ),    
+    # double clat_vertices(cell=9868, nv=3);
+    clat_vertices=FieldDescriptor(
+        primary_axis=0,
+        location_type=LocationType.Cell,
+    ),
+
+    # double vlon_vertices(vertex=5287, ne=6);
+    vlon_vertices=FieldDescriptor(
+        primary_axis=0,
+        location_type=LocationType.Vertex,
+    ),    
+
+    # double vlat_vertices(vertex=5287, ne=6);
+    vlat_vertices=FieldDescriptor(
+        primary_axis=0,
+        location_type=LocationType.Vertex,
+    ),    
+
+    # double cell_area(cell=9868);
+    #   :coordinates = "clon clat";
+    cell_area=FieldDescriptor(
+        location_type=LocationType.Cell
+    ),
+
+    # double lon_edge_centre(edge=15155);
+    #   :cdi = "ignore";
+    lon_edge_centre=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+
+    # double lat_edge_centre(edge=15155);
+    #   :cdi = "ignore";
+    lat_edge_centre=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+
+    # int edge_of_cell(nv=3, cell=9868);
+    #   :cdi = "ignore";
+    edge_of_cell=FieldDescriptor(
+        primary_axis=1,
+        location_type=LocationType.Cell,
+        indexes_into=LocationType.Edge,
+    ),
+
+    # int vertex_of_cell(nv=3, cell=9868);
+    #   :cdi = "ignore";
+    vertex_of_cell=FieldDescriptor(
+        primary_axis=1,
+        location_type=LocationType.Cell,
+        indexes_into=LocationType.Vertex,
+    ),
+
+    # int adjacent_cell_of_edge(nc=2, edge=15155);
+    #   :cdi = "ignore";
+    adjacent_cell_of_edge=FieldDescriptor(
+        primary_axis=1,
+        location_type=LocationType.Edge,
+        indexes_into=LocationType.Cell,
+    ),
+
+    # int edge_vertices(nc=2, edge=15155);
+    #   :cdi = "ignore";
+    edge_vertices=FieldDescriptor(
+        primary_axis=1,
+        location_type=LocationType.Edge,
+        indexes_into=LocationType.Vertex,
+    ),
+
+    # int cells_of_vertex(ne=6, vertex=5287);
+    #   :cdi = "ignore";
+    cells_of_vertex=FieldDescriptor(
+        primary_axis=1,
+        location_type=LocationType.Vertex,
+        indexes_into=LocationType.Cell,
+    ),
+
+    # double edge_length(edge=15155);
+    #   :coordinates = "elon elat";
+    edge_length=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+
+    # double zonal_normal_primal_edge(edge=15155);
+    #   :cdi = "ignore";
+    zonal_normal_primal_edge=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+
+    # double meridional_normal_primal_edge(edge=15155);
+    #   :cdi = "ignore";
+    meridional_normal_primal_edge=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+
+    # int neighbor_cell_index(nv=3, cell=9868);
+    #   :cdi = "ignore";
+    neighbor_cell_index=FieldDescriptor(
+        primary_axis=1,
+        location_type=LocationType.Cell,
+        indexes_into=LocationType.Cell,
+    ),
+
+    # int global_cell_index(cell=9868);
+    #   :cdi = "ignore";
+    #   :nglobal = 20340; // int
+    global_cell_index=FieldDescriptor(
+        location_type=LocationType.Cell
+    ),
+
+    # int global_edge_index(edge=15155);
+    #   :cdi = "ignore";
+    #   :nglobal = 30715; // int
+    global_edge_index=FieldDescriptor(
+        location_type=LocationType.Edge
+    ),
+
+
+)
 
 def apply_permutation(
     ncf,
@@ -326,6 +539,25 @@ def apply_permutation(
 
         field[:] = array
 
+def apply_permutation_latbc(
+    ncf,
+    perm_cells: np.ndarray,
+    perm_edges: np.ndarray,
+    schema: GridScheme,    
+) -> None:
+    for field_name, descr in schema.items():           
+        field = ncf.variables[field_name]
+        array = np.copy(field[:])
+
+        if field_name == "global_edge_index":            
+            rev_perm = revert_permutation(perm_edges)
+            array = array - 1
+            field[:] = rev_perm[array] + 1
+
+        if field_name == "global_cell_index":
+            rev_perm = revert_permutation(perm_cells)
+            array = array - 1
+            field[:] = rev_perm[array] + 1
 
 def order_around(center, points):
     centered_points = points - center
@@ -767,6 +999,7 @@ class SimpleRowMajorSorting:
 
 
 TEMP_FILE_NAME = "./temp.nc"
+TEMP_FILE_NAME_LAT = "./temp_lat.nc"
 
 
 def main():
@@ -774,17 +1007,23 @@ def main():
     grid = Grid.from_netCDF4(grid_file)
     parent_grid_file = netCDF4.Dataset("grid.parent.nc")
     parent_grid = Grid.from_netCDF4(parent_grid_file)
+    lateral_grid_file = netCDF4.Dataset("lateral_boundary.grid.nc")
+    lateral_grid = Grid.lat_from_netCDF4(lateral_grid_file)
 
     #FIXME: we also have to adjust some things in ./lateral_boundary.grid.nc
-    write_back = False
+    write_back = True
     if write_back:
-        shutil.copy("./grid.nc", "./grid.benchmark.row-major.nc")
-        grid_modified_file = netCDF4.Dataset("grid.benchmark.row-major.nc", "r+")
+        shutil.copy("./grid.nc", "./grid_row-major.nc")
+        grid_modified_file = netCDF4.Dataset("./grid_row-major.nc", "r+")
+        shutil.copy("./lateral_boundary.grid.nc", "./lateral_boundary.grid_row-major.nc")
+        lateral_grid_modified_file = netCDF4.Dataset("./lateral_boundary.grid_row-major.nc", "r+")
     else:
         # we don't want to write back, but we still want to be able to modify
         # so we just use a temporary file that we can open in read/write mode
         shutil.copy("./grid.nc", TEMP_FILE_NAME)
         grid_modified_file = netCDF4.Dataset(TEMP_FILE_NAME, "r+")
+        shutil.copy("./lateral_boundary.grid.nc", TEMP_FILE_NAME_LAT)
+        lateral_grid_modified_file = netCDF4.Dataset(TEMP_FILE_NAME, "r+")
 
     # the line of the right direction angle for vertex #0:
     p1 = np.array([[0.18511014, 0.79054856]])
@@ -804,6 +1043,8 @@ def main():
     apply_permutation(grid_modified_file, c_perm, ICON_grid_schema, LocationType.Cell)
     apply_permutation(grid_modified_file, e_perm, ICON_grid_schema, LocationType.Edge)
     apply_permutation(grid_modified_file, v_perm, ICON_grid_schema, LocationType.Vertex)
+
+    apply_permutation_latbc(lateral_grid_modified_file, c_perm, e_perm, ICON_grid_schema_lat)
 
     #TODO: neighbor table sorting
 
