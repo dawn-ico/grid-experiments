@@ -319,7 +319,7 @@ ICON_grid_schema = make_schema(
     ),
 )
 
-ICON_grid_schema_lat = make_schema(
+ICON_grid_schema_lat_grid = make_schema(
   
     # double clon(cell=9868);
     #   :units = "radian";
@@ -493,17 +493,577 @@ ICON_grid_schema_lat = make_schema(
     #   :cdi = "ignore";
     #   :nglobal = 20340; // int
     global_cell_index=FieldDescriptor(
-        location_type=LocationType.Cell
+        location_type=LocationType.Cell,
+        indexes_into=LocationType.Cell  #NOTE: this maps into cells of grid.nc, not lateral_boundary.grid.nc
     ),
 
     # int global_edge_index(edge=15155);
     #   :cdi = "ignore";
     #   :nglobal = 30715; // int
     global_edge_index=FieldDescriptor(
-        location_type=LocationType.Edge
+        location_type=LocationType.Edge,
+        indexes_into=LocationType.Edge #NOTE: this maps into cells of grid.nc, not lateral_boundary.grid.nc
     ),
+)
 
+ICON_grid_schema_ic = make_schema(    
+    # double clon(ncells=20340);
+    #   :standard_name = "longitude";
+    #   :long_name = "center longitude";
+    #   :units = "radian";
+    #   :bounds = "clon_bnds";
+    clon = FieldDescriptor(location_type=LocationType.Cell),
 
+    # double clon_bnds(ncells=20340, vertices=3);
+    # clon_bnds = FieldDescriptor(location_type=LocationType.Cell, indexes_into=LocationType.Vertex, primary_axis=0),
+    clon_bnds = FieldDescriptor(location_type=LocationType.Cell, primary_axis=0),
+    
+
+    # double clat(ncells=20340);
+    #   :standard_name = "latitude";
+    #   :long_name = "center latitude";
+    #   :units = "radian";
+    #   :bounds = "clat_bnds";
+    clat = FieldDescriptor(location_type=LocationType.Cell),
+
+    # double clat_bnds(ncells=20340, vertices=3);
+    # clat_bnds = FieldDescriptor(location_type=LocationType.Cell, indexes_into=LocationType.Vertex, primary_axis=0),    
+    clat_bnds = FieldDescriptor(location_type=LocationType.Cell, primary_axis=0),    
+
+    # float HHL(time=1, height=91, ncells=20340);
+    #   :long_name = "Geometric Height of the layer limits above sea level(NN)";
+    #   :units = "m";
+    #   :param = "6.3.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    HHL = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float U(time=1, height_2=90, ncells=20340);
+    #   :standard_name = "eastward_wind";
+    #   :long_name = "U-Component of Wind";
+    #   :units = "m s-1";
+    #   :param = "2.2.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    U = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float V(time=1, height_2=90, ncells=20340);
+    #   :standard_name = "northward_wind";
+    #   :long_name = "V-Component of Wind";
+    #   :units = "m s-1";
+    #   :param = "3.2.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    V = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float W(time=1, height_3=91, ncells=20340);
+    #   :long_name = "Vertical Velocity (Geometric) (w)";
+    #   :units = "m s-1";
+    #   :param = "9.2.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    W = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float T(time=1, height_2=90, ncells=20340);
+    #   :standard_name = "air_temperature";
+    #   :long_name = "Temperature";
+    #   :units = "K";
+    #   :param = "0.0.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    T = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float P(time=1, height_2=90, ncells=20340);
+    #   :long_name = "Pressure";
+    #   :units = "Pa";
+    #   :param = "0.3.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    P = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float QV(time=1, height_2=90, ncells=20340);
+    #   :standard_name = "specific_humidity";
+    #   :long_name = "Specific Humidity";
+    #   :units = "kg kg-1";
+    #   :param = "0.1.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    QV = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float QC(time=1, height_2=90, ncells=20340);
+    #   :long_name = "Cloud Mixing Ratio";
+    #   :units = "kg kg-1";
+    #   :param = "22.1.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    QC = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float QI(time=1, height_2=90, ncells=20340);
+    #   :long_name = "Cloud Ice Mixing Ratio";
+    #   :units = "kg kg-1";
+    #   :param = "82.1.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    QI = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float QR(time=1, height_2=90, ncells=20340);
+    #   :long_name = "Rain mixing ratio";
+    #   :units = "kg kg-1";
+    #   :param = "24.1.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    QR = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float QS(time=1, height_2=90, ncells=20340);
+    #   :long_name = "Snow mixing ratio";
+    #   :units = "kg kg-1";
+    #   :param = "25.1.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    QS = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float T_G(time=1, ncells=20340);
+    #   :standard_name = "air_temperature";
+    #   :long_name = "Temperature (G)";
+    #   :units = "K";
+    #   :param = "0.0.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    T_G = FieldDescriptor(location_type=LocationType.Cell, primary_axis=1),
+
+    # float T_ICE(time=1, ncells=20340);
+    #   :long_name = "Sea Ice Temperature";
+    #   :units = "K";
+    #   :param = "8.2.10";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    T_ICE = FieldDescriptor(location_type=LocationType.Cell, primary_axis=1),
+
+    # float H_ICE(time=1, ncells=20340);
+    #   :long_name = "Sea Ice Thickness";
+    #   :units = "m";
+    #   :param = "1.2.10";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    H_ICE = FieldDescriptor(location_type=LocationType.Cell, primary_axis=1),
+
+    # float T_MNW_LK(time=1, ncells=20340);
+    #   :long_name = "Mean temperature of the water column";
+    #   :units = "K";
+    #   :param = "1.2.1";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    T_MNW_LK = FieldDescriptor(location_type=LocationType.Cell, primary_axis=1),
+
+    # float T_WML_LK(time=1, ncells=20340);
+    #   :long_name = "Mixed-layer temperature";
+    #   :units = "K";
+    #   :param = "1.2.1";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    T_WML_LK = FieldDescriptor(location_type=LocationType.Cell, primary_axis=1),
+
+    # float H_ML_LK(time=1, ncells=20340);
+    #   :long_name = "Mixed-layer depth";
+    #   :units = "m";
+    #   :param = "0.2.1";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    H_ML_LK = FieldDescriptor(location_type=LocationType.Cell, primary_axis=1),
+
+    # float T_BOT_LK(time=1, ncells=20340);
+    #   :long_name = "Bottom temperature (temperature at the water-bottom sediment interface)";
+    #   :units = "K";
+    #   :param = "1.2.1";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    #   :level_type = "lakebottom";
+    T_BOT_LK = FieldDescriptor(location_type=LocationType.Cell, primary_axis=1),
+
+    # float C_T_LK(time=1, ncells=20340);
+    #   :long_name = "Shape factor with respect to the temperature profile in the thermocline";
+    #   :units = "Numeric";
+    #   :param = "10.2.1";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    #   :level_type = "mixlayer";
+    C_T_LK = FieldDescriptor(location_type=LocationType.Cell, primary_axis=1),
+
+    # float QV_S(time=1, ncells=20340);
+    #   :standard_name = "specific_humidity";
+    #   :long_name = "Specific Humidity (S)";
+    #   :units = "kg kg-1";
+    #   :param = "0.1.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    QV_S = FieldDescriptor(location_type=LocationType.Cell, primary_axis=1),
+
+    # float T_SO(time=1, depth=9, ncells=20340);
+    #   :long_name = "Soil Temperature (multilayer model)";
+    #   :units = "K";
+    #   :param = "18.3.2";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    T_SO = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float W_SO(time=1, depth_2=8, ncells=20340);
+    #   :long_name = "Column-integrated Soil Moisture (multilayers)";
+    #   :units = "kg m-2";
+    #   :param = "20.3.2";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    W_SO = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float W_SO_ICE(time=1, depth_2=8, ncells=20340);
+    #   :long_name = "soil ice content (multilayers)";
+    #   :units = "kg m-2";
+    #   :param = "22.3.2";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    W_SO_ICE = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float ALB_SEAICE(time=1, ncells=20340);
+    #   :long_name = "sea ice albedo - diffusive solar (0.3 - 5.0 m-6)";
+    #   :units = "%";
+    #   :param = "234.19.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    ALB_SEAICE = FieldDescriptor(location_type=LocationType.Cell, primary_axis=1),
+
+    # float EVAP_PL(time=1, ncells=20340);
+    #   :long_name = "evaporation of plants (integrated since \"nightly reset\")";
+    #   :units = "kgm-2";
+    #   :param = "198.0.2";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    EVAP_PL = FieldDescriptor(location_type=LocationType.Cell, primary_axis=1),
+
+    # float SMI(time=1, depth_2=8, ncells=20340);
+    #   :long_name = "soil moisture index (multilayers)";
+    #   :units = "Numeric";
+    #   :param = "200.3.2";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    SMI = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float RHO_SNOW(time=1, ncells=20340);
+    #   :long_name = "Snow density";
+    #   :units = "kg m-3";
+    #   :param = "61.1.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    RHO_SNOW = FieldDescriptor(location_type=LocationType.Cell, primary_axis=1),
+
+    # float T_SNOW(time=1, ncells=20340);
+    #   :long_name = "Snow temperature (top of snow)";
+    #   :units = "K";
+    #   :param = "18.0.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    T_SNOW = FieldDescriptor(location_type=LocationType.Cell, primary_axis=1),
+
+    # float W_SNOW(time=1, ncells=20340);
+    #   :long_name = "Snow depth water equivalent";
+    #   :units = "kg m-2";
+    #   :param = "60.1.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    W_SNOW = FieldDescriptor(location_type=LocationType.Cell, primary_axis=1),
+
+    # float H_SNOW(time=1, ncells=20340);
+    #   :standard_name = "lwe_thickness_of_surface_snow_amount";
+    #   :long_name = "Snow Depth";
+    #   :units = "m";
+    #   :param = "11.1.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    H_SNOW = FieldDescriptor(location_type=LocationType.Cell, primary_axis=1),
+
+    # float W_I(time=1, ncells=20340);
+    #   :long_name = "Plant Canopy Surface Water";
+    #   :units = "kg m-2";
+    #   :param = "13.0.2";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    W_I = FieldDescriptor(location_type=LocationType.Cell, primary_axis=1),
+
+    # float FRESHSNW(time=1, ncells=20340);
+    #   :long_name = "Fresh snow factor (weighting function for albedo indicating freshness of snow)";
+    #   :units = "Numeric";
+    #   :param = "203.1.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    FRESHSNW = FieldDescriptor(location_type=LocationType.Cell, primary_axis=1),
+
+    # float Z0(time=1, ncells=20340);
+    #   :standard_name = "surface_roughness_length";
+    #   :long_name = "Surface Roughness length Surface Roughness";
+    #   :units = "m";
+    #   :param = "1.0.2";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    Z0 = FieldDescriptor(location_type=LocationType.Cell, primary_axis=1),
+
+    # float FR_ICE(time=1, ncells=20340);
+    #   :standard_name = "sea_ice_area_fraction";
+    #   :long_name = "Sea Ice Cover ( 0= free, 1=cover)";
+    #   :units = "Proportion";
+    #   :param = "0.2.10";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    FR_ICE = FieldDescriptor(location_type=LocationType.Cell, primary_axis=1),
+)
+
+#NOTE: this is probably not needed since we are not reordering lateral_boundary.grid.nc (but the indexes therein)
+ICON_grid_schema_lbc = make_schema(
+    # double clon(ncells=9868);
+    #   :standard_name = "longitude";
+    #   :long_name = "center longitude";
+    #   :units = "radian";
+    #   :bounds = "clon_bnds";
+    clon = FieldDescriptor(location_type=LocationType.Cell),
+
+    # double clon_bnds(ncells=9868, vertices=3);
+    # clon_bnds = FieldDescriptor(location_type=LocationType.Cell, indexes_into=LocationType.Vertex, primary_axis=0),
+    clon_bnds = FieldDescriptor(location_type=LocationType.Cell, primary_axis=0),
+
+    # double clat(ncells=9868);
+    #   :standard_name = "latitude";
+    #   :long_name = "center latitude";
+    #   :units = "radian";
+    #   :bounds = "clat_bnds";
+    clat = FieldDescriptor(location_type=LocationType.Cell),
+
+    # double clat_bnds(ncells=9868, vertices=3);
+    # clat_bnds = FieldDescriptor(location_type=LocationType.Cell, indexes_into=LocationType.Vertex, primary_axis=0),    
+    clat_bnds = FieldDescriptor(location_type=LocationType.Cell, primary_axis=0),    
+
+    # float HHL(time=1, height=91, ncells=9868);
+    #   :long_name = "Geometric Height of the layer limits above sea level(NN)";
+    #   :units = "m";
+    #   :param = "6.3.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    HHL = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float U(time=1, height_2=90, ncells=9868);
+    #   :standard_name = "eastward_wind";
+    #   :long_name = "U-Component of Wind";
+    #   :units = "m s-1";
+    #   :param = "2.2.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    U = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float V(time=1, height_2=90, ncells=9868);
+    #   :standard_name = "northward_wind";
+    #   :long_name = "V-Component of Wind";
+    #   :units = "m s-1";
+    #   :param = "3.2.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    V = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float W(time=1, height_3=91, ncells=9868);
+    #   :long_name = "Vertical Velocity (Geometric) (w)";
+    #   :units = "m s-1";
+    #   :param = "9.2.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    W = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float T(time=1, height_2=90, ncells=9868);
+    #   :standard_name = "air_temperature";
+    #   :long_name = "Temperature";
+    #   :units = "K";
+    #   :param = "0.0.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    T = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float P(time=1, height_2=90, ncells=9868);
+    #   :long_name = "Pressure";
+    #   :units = "Pa";
+    #   :param = "0.3.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    P = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float QV(time=1, height_2=90, ncells=9868);
+    #   :standard_name = "specific_humidity";
+    #   :long_name = "Specific Humidity";
+    #   :units = "kg kg-1";
+    #   :param = "0.1.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    QV = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float QC(time=1, height_2=90, ncells=9868);
+    #   :long_name = "Cloud Mixing Ratio";
+    #   :units = "kg kg-1";
+    #   :param = "22.1.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    QC = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float QI(time=1, height_2=90, ncells=9868);
+    #   :long_name = "Cloud Ice Mixing Ratio";
+    #   :units = "kg kg-1";
+    #   :param = "82.1.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    QI = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float QR(time=1, height_2=90, ncells=9868);
+    #   :long_name = "Rain mixing ratio";
+    #   :units = "kg kg-1";
+    #   :param = "24.1.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    QR = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
+
+    # float QS(time=1, height_2=90, ncells=9868);
+    #   :long_name = "Snow mixing ratio";
+    #   :units = "kg kg-1";
+    #   :param = "25.1.0";
+    #   :CDI_grid_type = "unstructured";
+    #   :number_of_grid_in_reference = 1; // int
+    #   :coordinates = "clat clon";
+    #   :_FillValue = -8.9999998E15f; // float
+    #   :missing_value = -8.9999998E15f; // float
+    QS = FieldDescriptor(location_type=LocationType.Cell, primary_axis=2),
 )
 
 def apply_permutation(
@@ -539,7 +1099,7 @@ def apply_permutation(
 
         field[:] = array
 
-def apply_permutation_latbc(
+def apply_permutation_latbc_grid(
     ncf,
     perm_cells: np.ndarray,
     perm_edges: np.ndarray,
@@ -1003,20 +1563,39 @@ TEMP_FILE_NAME_LAT = "./temp_lat.nc"
 
 
 def main():
+    # copy files from pool directory
+    shutil.copy("../my_pool/data/ICON/mch/grids/ch_r04b09/grid_icon.nc", "grid.nc")
+    # shutil.copy("../my_pool/data/ICON/mch/grids/ch_r04b09/grid.parent_icon.nc", "grid.parent.nc")
+    shutil.copy("../my_pool/data/ICON/mch/input/ch_r04b09/lateral_boundary.grid_icon.nc", "lateral_boundary.grid.nc")
+    shutil.copy("../my_pool/data/ICON/mch/input/ch_r04b09/igfff00000000_icon.nc", "igfff00000000.nc")
+    # shutil.copy("../my_pool/data/ICON/mch/input/ch_r04b09/igfff00000000_lbc_icon.nc", "igfff00000000_lbc.nc")
+    # shutil.copy("../my_pool/data/ICON/mch/input/ch_r04b09/igfff00030000_lbc_icon.nc", "igfff00030000_lbc.nc")
+
     grid_file = netCDF4.Dataset("grid.nc")
     grid = Grid.from_netCDF4(grid_file)
-    parent_grid_file = netCDF4.Dataset("grid.parent.nc")
-    parent_grid = Grid.from_netCDF4(parent_grid_file)
+    # parent_grid_file = netCDF4.Dataset("grid.parent.nc")
+    # parent_grid = Grid.from_netCDF4(parent_grid_file)
     lateral_grid_file = netCDF4.Dataset("lateral_boundary.grid.nc")
-    lateral_grid = Grid.lat_from_netCDF4(lateral_grid_file)
-
-    #FIXME: we also have to adjust some things in ./lateral_boundary.grid.nc
+    # lateral_grid = Grid.lat_from_netCDF4(lateral_grid_file)
+    
+    init_con_grid_file = netCDF4.Dataset("igfff00000000.nc")
+    # lbc_00000000_file = netCDF4.Dataset("igfff00000000_lbc.nc")
+    # lbc_00030000_file = netCDF4.Dataset("igfff00030000_lbc.nc")   
+   
     write_back = True
     if write_back:
         shutil.copy("./grid.nc", "./grid_row-major.nc")
         grid_modified_file = netCDF4.Dataset("./grid_row-major.nc", "r+")
+        # shutil.copy("./grid.parent.nc", "./grid.parent_row-major.nc")
+        # grid_parent_modified_file = netCDF4.Dataset("./grid_row-major.nc", "r+")
         shutil.copy("./lateral_boundary.grid.nc", "./lateral_boundary.grid_row-major.nc")
         lateral_grid_modified_file = netCDF4.Dataset("./lateral_boundary.grid_row-major.nc", "r+")
+        shutil.copy("./igfff00000000.nc", "./igfff00000000_row-major.nc")
+        init_con_grid_file_modified_file = netCDF4.Dataset("./igfff00000000_row-major.nc", "r+")
+        # shutil.copy("./igfff00000000_lbc.nc", "./igfff00000000_lbc_row-major.nc")
+        # lbc_00000000_file_modified_file = netCDF4.Dataset("./lateral_boundary.grid_row-major.nc", "r+")
+        # shutil.copy("./igfff00030000_lbc.nc", "./igfff00030000_lbc_row-major.nc")
+        # lbc_00030000_file_modified_file = netCDF4.Dataset("./lateral_boundary.grid_row-major.nc", "r+")
     else:
         # we don't want to write back, but we still want to be able to modify
         # so we just use a temporary file that we can open in read/write mode
@@ -1044,7 +1623,12 @@ def main():
     apply_permutation(grid_modified_file, e_perm, ICON_grid_schema, LocationType.Edge)
     apply_permutation(grid_modified_file, v_perm, ICON_grid_schema, LocationType.Vertex)
 
-    apply_permutation_latbc(lateral_grid_modified_file, c_perm, e_perm, ICON_grid_schema_lat)
+    apply_permutation_latbc_grid(lateral_grid_modified_file, c_perm, e_perm, ICON_grid_schema_lat_grid)    
+
+    apply_permutation(init_con_grid_file_modified_file, c_perm, ICON_grid_schema_ic, LocationType.Cell)
+    apply_permutation(init_con_grid_file_modified_file, e_perm, ICON_grid_schema_ic, LocationType.Edge)
+    apply_permutation(init_con_grid_file_modified_file, v_perm, ICON_grid_schema_ic, LocationType.Vertex)
+    
 
     #TODO: neighbor table sorting
 
@@ -1069,34 +1653,34 @@ def main():
     #grid.c2e = np.sort(grid.c2e)
 
     # reload the grid after we've modified it
-    grid = Grid.from_netCDF4(grid_modified_file)
+    # grid = Grid.from_netCDF4(grid_modified_file)
 
-    fig, ax = plt.subplots()
+    # fig, ax = plt.subplots()
 
-    take_branch: typing.Optional[LocationType] = LocationType.Cell
+    # take_branch: typing.Optional[LocationType] = LocationType.Cell
 
-    if take_branch is LocationType.Vertex:
-        vertices = plot_vertices(ax, grid, field=np.arange(grid.nv))
-        # transparent edges
-        vertices.set_edgecolor((0, 0, 0, 0))
-        fig.colorbar(vertices, ax=ax)
+    # if take_branch is LocationType.Vertex:
+    #     vertices = plot_vertices(ax, grid, field=np.arange(grid.nv))
+    #     # transparent edges
+    #     vertices.set_edgecolor((0, 0, 0, 0))
+    #     fig.colorbar(vertices, ax=ax)
 
-    elif take_branch is LocationType.Edge:
-        edges = plot_edges(ax, grid, field=np.arange(grid.ne))
-        # transparent edges
-        edges.set_edgecolor((0, 0, 0, 0))
-        fig.colorbar(edges, ax=ax)
+    # elif take_branch is LocationType.Edge:
+    #     edges = plot_edges(ax, grid, field=np.arange(grid.ne))
+    #     # transparent edges
+    #     edges.set_edgecolor((0, 0, 0, 0))
+    #     fig.colorbar(edges, ax=ax)
 
-    elif take_branch is LocationType.Cell:
-        cells = plot_cells(ax, grid, field=np.arange(grid.nc))
-        # transparent edges
-        cells.set_edgecolor((0, 0, 0, 0))
-        fig.colorbar(cells, ax=ax)
+    # elif take_branch is LocationType.Cell:
+    #     cells = plot_cells(ax, grid, field=np.arange(grid.nc))
+    #     # transparent edges
+    #     cells.set_edgecolor((0, 0, 0, 0))
+    #     fig.colorbar(cells, ax=ax)
 
-    elif take_branch is None:
-        pass # this is the plot none branch
-    else:
-        assert False
+    # elif take_branch is None:
+    #     pass # this is the plot none branch
+    # else:
+    #     assert False
 
     #ax.plot(grid.v_lon_lat[range_to_slice(v_grf[0]), 0], grid.v_lon_lat[range_to_slice(v_grf[0]), 1], 'o-')
     #ax.plot(grid.e_lon_lat[range_to_slice(e_grf[0]), 0], grid.e_lon_lat[range_to_slice(e_grf[0]), 1], 'o-')
@@ -1104,12 +1688,20 @@ def main():
 
     if write_back:
         grid_modified_file.sync()
+        lateral_grid_modified_file.sync()
+        init_con_grid_file_modified_file.sync()       
+        # lbc_00000000_file_modified_file.sync()              
+        # lbc_00030000_file_modified_file.sync()       
     else:
         os.remove(TEMP_FILE_NAME)
 
-    ax.autoscale()
-    plt.show()
+    # ax.autoscale()
+    # plt.show()
 
+    # copy files back
+    shutil.copy("grid_row-major.nc", "../my_pool/data/ICON/mch/grids/ch_r04b09/grid.nc")   
+    shutil.copy("lateral_boundary.grid_row-major.nc", "../my_pool/data/ICON/mch/input/ch_r04b09/lateral_boundary.grid.nc")
+    shutil.copy("igfff00000000_row-major.nc", "../my_pool/data/ICON/mch/input/ch_r04b09/igfff00000000.nc")
 
 if __name__ == "__main__":
     main()
