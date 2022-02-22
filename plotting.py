@@ -1,10 +1,12 @@
-from typing import Grid, LocationType, DEVICE_MISSING_VALUE
+from grid_types import Grid, LocationType, DEVICE_MISSING_VALUE
 import numpy as np
 from matplotlib import (
     pyplot as plt,
     patches,
     collections,
 )
+import netCDF4
+
 
 def order_around(center, points):
     centered_points = points - center
@@ -93,38 +95,33 @@ def plot_edges(ax, grid: Grid, field=None):
 
     return collection
 
-def plot_grid(grid: Grid, location: LocationType):
-      # reload the grid after we've modified it
-    # parent_grid_modified_file.sync()
-    # grid = Grid.from_netCDF4(parent_grid_modified_file)
+def plot_grid(fname: str, location: LocationType):
+    grid_file = netCDF4.Dataset(fname)
+    grid = Grid.from_netCDF4(grid_file)
     
-    # fig, ax = plt.subplots()
+    fig, ax = plt.subplots()    
 
-    # take_branch: typing.Optional[LocationType] = LocationType.Vertex
+    if location is LocationType.Vertex:
+        vertices = plot_vertices(ax, grid, field=np.arange(grid.nv))
+        # transparent edges
+        vertices.set_edgecolor((0, 0, 0, 0))
+        fig.colorbar(vertices, ax=ax)
 
-    # if take_branch is LocationType.Vertex:
-    #     vertices = plot_vertices(ax, grid, field=np.arange(grid.nv))
-    #     # transparent edges
-    #     vertices.set_edgecolor((0, 0, 0, 0))
-    #     fig.colorbar(vertices, ax=ax)
+    elif location is LocationType.Edge:
+        edges = plot_edges(ax, grid, field=np.arange(grid.ne))
+        # transparent edges
+        edges.set_edgecolor((0, 0, 0, 0))
+        fig.colorbar(edges, ax=ax)
 
-    # elif take_branch is LocationType.Edge:
-    #     edges = plot_edges(ax, grid, field=np.arange(grid.ne))
-    #     # transparent edges
-    #     edges.set_edgecolor((0, 0, 0, 0))
-    #     fig.colorbar(edges, ax=ax)
-
-    # if take_branch is LocationType.Cell:
-    #     cells = plot_cells(ax, grid, field=np.arange(grid.nc))
-    #     # transparent edges
-    #     cells.set_edgecolor((0, 0, 0, 0))
-    #     fig.colorbar(cells, ax=ax)
-
-    # elif take_branch is None:
-    #     pass # this is the plot none branch
-    # else:
-    #     assert False
+    elif location is LocationType.Cell:
+        cells = plot_cells(ax, grid, field=np.arange(grid.nc))
+        # transparent edges
+        cells.set_edgecolor((0, 0, 0, 0))
+        fig.colorbar(cells, ax=ax)
 
     #ax.plot(grid.v_lon_lat[range_to_slice(v_grf[0]), 0], grid.v_lon_lat[range_to_slice(v_grf[0]), 1], 'o-')
     #ax.plot(grid.e_lon_lat[range_to_slice(e_grf[0]), 0], grid.e_lon_lat[range_to_slice(e_grf[0]), 1], 'o-')
     #ax.plot(grid.c_lon_lat[range_to_slice(c_grf[0]), 0], grid.c_lon_lat[range_to_slice(c_grf[0]), 1], 'o-')
+
+    ax.autoscale()
+    plt.show()

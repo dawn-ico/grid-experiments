@@ -445,11 +445,39 @@ class SimpleRowMajorSorting:
     def cell_compare(a, b) -> int:
         return (a[2] - b[2] if a[0] == b[0] else a[0] - b[0]) if b[1] == a[1] else b[1] - a[1]
 
-def reorder_grid():
-  ...
+def do_reorder_grid(fname: str, schema: GridScheme):
+  grid_file = netCDF4.Dataset(fname)
+  grid = Grid.from_netCDF4(grid_file)
+  fname_mod = fname[:-3] + "_row-major.nc"
+  shutil.copy(fname, fname_mod)
+  grid_modified_file = netCDF4.Dataset(fname_mod, "r+")
 
-def reorder_parent_grid():
-  ...
+  # the line of the right direction angle for vertex #0:
+  p1 = np.array([[0.18511014, 0.79054856]])
+  p2 = np.array([[0.18593181, 0.79048109]])
+  right_direction_angle = np.squeeze(get_angle(p2 - p1))
+
+  mapping = create_structured_grid_mapping(grid, right_direction_angle, angle_threshold=np.deg2rad(15))  
+
+  v_grf = get_grf_ranges(grid, LocationType.Vertex)
+  e_grf = get_grf_ranges(grid, LocationType.Edge)
+  c_grf = get_grf_ranges(grid, LocationType.Cell)
+
+  v_perm = argsort_simple(mapping.vertex_mapping, SimpleRowMajorSorting.vertex_compare, v_grf[0])
+  e_perm = argsort_simple(mapping.edge_mapping, SimpleRowMajorSorting.edge_compare, e_grf[0])
+  c_perm = argsort_simple(mapping.cell_mapping, SimpleRowMajorSorting.cell_compare, c_grf[0])     
+
+  apply_permutation(grid_modified_file, c_perm, schema, LocationType.Cell)
+  apply_permutation(grid_modified_file, e_perm, schema, LocationType.Edge)
+  apply_permutation(grid_modified_file, v_perm, schema, LocationType.Vertex)      
+  
+  grid_modified_file.sync()
+
+def reorder_parent(fname):
+  do_reorder_grid(fname, ICON_grid_schema)
+
+def reorder_parent_grid(fname):
+  do_reorder_grid(fname, ICON_grid_schema_parent)
 
 def reorder_pool_folder():
     grid_file = netCDF4.Dataset("grid.nc")
