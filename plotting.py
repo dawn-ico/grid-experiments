@@ -1,4 +1,4 @@
-from grid_types import Grid, LocationType, DEVICE_MISSING_VALUE
+from grid_types import Grid, GridLBC, LocationType, DEVICE_MISSING_VALUE
 import numpy as np
 from matplotlib import (
     pyplot as plt,
@@ -122,6 +122,10 @@ def plot_grid(fname: str, location: LocationType):
     #ax.plot(grid.v_lon_lat[range_to_slice(v_grf[0]), 0], grid.v_lon_lat[range_to_slice(v_grf[0]), 1], 'o-')
     #ax.plot(grid.e_lon_lat[range_to_slice(e_grf[0]), 0], grid.e_lon_lat[range_to_slice(e_grf[0]), 1], 'o-')
     #ax.plot(grid.c_lon_lat[range_to_slice(c_grf[0]), 0], grid.c_lon_lat[range_to_slice(c_grf[0]), 1], 'o-')
+
+    latbc_file = netCDF4.Dataset('igfff00000000_lbc.nc')
+    grid_latbc = GridLBC.from_netCDF4_lbc(latbc_file)
+    ax.plot(grid_latbc.c_lon_lat[:,0], grid_latbc.c_lon_lat[:,1], 'o-')
 
     ax.autoscale()
     plt.show()

@@ -52,6 +52,21 @@ class Grid:
             c_grf=np.concatenate((get_var("start_idx_c"), get_var("end_idx_c")), axis=1) - 1,
         )
 
+@dataclasses.dataclass
+class GridLBC:
+   
+    c_lon_lat: np.ndarray
+
+    @staticmethod
+    def from_netCDF4_lbc(ncf) -> GridLBC:
+
+        def get_var(name) -> np.ndarray:
+            return np.array(ncf.variables[name][:].T)
+
+        return GridLBC(
+            c_lon_lat=np.stack((get_var("clon"), get_var("clat")), axis=1),
+        )
+
 
 class LocationType(enum.Enum):
     Vertex = enum.auto()

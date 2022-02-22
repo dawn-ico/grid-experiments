@@ -6,6 +6,7 @@ import shutil
 from reordering import reorder_pool_folder
 from plotting import plot_grid
 from grid_types import LocationType
+from reduce_test import test_permutation
 
 def row_major_permutation_pool():
     shutil.copy("../my_pool/data/ICON/mch/grids/ch_r04b09/grid_icon.nc", "grid.nc")
@@ -24,5 +25,6 @@ def row_major_permutation_pool():
 
 if __name__ == "__main__":
     # row_major_permutation_pool()
+    # plot_grid("grid.nc", LocationType.Cell)
+    test_permutation("grid.nc", "grid_row-major.nc")
 
-    plot_grid("grid.parent_row-major.nc", LocationType.Vertex)
