@@ -8,15 +8,13 @@ from functools import cmp_to_key
 
 NaN = float("nan")
 
+
 def apply_permutation(
-    ncf,
-    perm: np.ndarray,
-    schema: GridScheme,
-    location_type: LocationType
+    ncf, perm: np.ndarray, schema: GridScheme, location_type: LocationType
 ) -> None:
     rev_perm = revert_permutation(perm)
 
-    for field_name, descr in schema.items():       
+    for field_name, descr in schema.items():
 
         field = ncf.variables[field_name]
         array = np.copy(field[:])
@@ -39,40 +37,47 @@ def apply_permutation(
 
             array = array + 1
 
-        field[:] = array
+        if field_name == "T":
+            print("adding 10 kelvin")
+            field[:] = array + 10
+        else:
+            field[:] = array
+
 
 def apply_permutation_latbc_grid(
     ncf,
     perm_cells: np.ndarray,
     perm_edges: np.ndarray,
-    schema: GridScheme,    
+    schema: GridScheme,
 ) -> None:
-    for field_name, descr in schema.items():           
+    for field_name, descr in schema.items():
         field = ncf.variables[field_name]
         array = np.copy(field[:])
 
-        if field_name == "global_edge_index":            
+        if field_name == "global_edge_index":
             rev_perm = revert_permutation(perm_edges)
             array = array - 1
-            field[:] = rev_perm[array] + 1            
+            field[:] = rev_perm[array] + 1
 
         if field_name == "global_cell_index":
             rev_perm = revert_permutation(perm_cells)
             array = array - 1
             field[:] = rev_perm[array] + 1
 
+
 def apply_permutation_into_parent_grid(
     ncf,
     perm_cells_parent: np.ndarray,
     perm_edges_parent: np.ndarray,
     perm_vertex_parent: np.ndarray,
-    schema: GridScheme):
+    schema: GridScheme,
+):
 
     rev_perm_cell = revert_permutation(perm_cells_parent)
     rev_perm_edges = revert_permutation(perm_edges_parent)
     rev_perm_vertex = revert_permutation(perm_vertex_parent)
 
-    for field_name, descr in schema.items():           
+    for field_name, descr in schema.items():
         field = ncf.variables[field_name]
         array = np.copy(field[:])
 
@@ -94,6 +99,7 @@ def apply_permutation_into_parent_grid(
             array[missing_values] = DEVICE_MISSING_VALUE
 
         field[:] = array + 1
+
 
 def get_grf_ranges(grid: Grid, location_type: LocationType = LocationType.Cell):
 
@@ -137,7 +143,7 @@ def range_to_slice(range: typing.Tuple[typing.Optional[int], typing.Optional[int
 
 
 def normalize_angle(angle):
-    return np.fmod(angle, 2*np.pi)
+    return np.fmod(angle, 2 * np.pi)
 
 
 def get_angle(p):
@@ -146,10 +152,9 @@ def get_angle(p):
 
 def rotate(points, angle, origin=np.array([[0, 0]])):
     points = points - origin
-    rotation_matrix = np.array([
-        [np.cos(angle), -np.sin(angle)],
-        [np.sin(angle), np.cos(angle) ]
-    ])
+    rotation_matrix = np.array(
+        [[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]]
+    )
     points = (rotation_matrix @ points.T).T
     return points + origin
 
@@ -191,20 +196,23 @@ def neighbor_array_to_set(array):
 #                 4                                       5
 #
 ###############################################################################
-structured_v2v_offsets = np.array([
-    # neighbor id/ray 0
-    [+1, +0],
-    # neighbor id/ray 1
-    [+0, +1],
-    # neighbor id/ray 2
-    [-1, +1],
-    # neighbor id/ray 3
-    [-1, +0],
-    # neighbor id/ray 4
-    [+0, -1],
-    # neighbor id/ray 5
-    [+1, -1],
-], dtype=int)
+structured_v2v_offsets = np.array(
+    [
+        # neighbor id/ray 0
+        [+1, +0],
+        # neighbor id/ray 1
+        [+0, +1],
+        # neighbor id/ray 2
+        [-1, +1],
+        # neighbor id/ray 3
+        [-1, +0],
+        # neighbor id/ray 4
+        [+0, -1],
+        # neighbor id/ray 5
+        [+1, -1],
+    ],
+    dtype=int,
+)
 
 ###############################################################################
 # Once each vertex has a unique x/y coordinate, we use those to assign
@@ -236,35 +244,41 @@ structured_v2v_offsets = np.array([
 #        /          \                       /          \
 #
 ###############################################################################
-structured_v2e_offsets = np.array([
-    # neighbor id/ray 0
-    [+0, +0, +2],
-    # neighbor id/ray 1
-    [+0, +0, +0],
-    # neighbor id/ray 2
-    [-1, +0, +1],
-    # neighbor id/ray 3
-    [-1, +0, +2],
-    # neighbor id/ray 4
-    [+0, -1, +0],
-    # neighbor id/ray 5
-    [+0, -1, +1],
-], dtype=int)
+structured_v2e_offsets = np.array(
+    [
+        # neighbor id/ray 0
+        [+0, +0, +2],
+        # neighbor id/ray 1
+        [+0, +0, +0],
+        # neighbor id/ray 2
+        [-1, +0, +1],
+        # neighbor id/ray 3
+        [-1, +0, +2],
+        # neighbor id/ray 4
+        [+0, -1, +0],
+        # neighbor id/ray 5
+        [+0, -1, +1],
+    ],
+    dtype=int,
+)
 # (for the cells, we shift the rays 15 degrees counter clock-wise)
-structured_v2c_offsets = np.array([
-    # neighbor id/ray 0
-    [+0, +0, +0],
-    # neighbor id/ray 1
-    [-1, +0, +1],
-    # neighbor id/ray 2
-    [-1, +0, +0],
-    # neighbor id/ray 3
-    [-1, -1, +1],
-    # neighbor id/ray 4
-    [+0, -1, +0],
-    # neighbor id/ray 5
-    [+0, -1, +1],
-], dtype=int)
+structured_v2c_offsets = np.array(
+    [
+        # neighbor id/ray 0
+        [+0, +0, +0],
+        # neighbor id/ray 1
+        [-1, +0, +1],
+        # neighbor id/ray 2
+        [-1, +0, +0],
+        # neighbor id/ray 3
+        [-1, -1, +1],
+        # neighbor id/ray 4
+        [+0, -1, +0],
+        # neighbor id/ray 5
+        [+0, -1, +1],
+    ],
+    dtype=int,
+)
 
 
 @dataclasses.dataclass
@@ -275,10 +289,7 @@ class GridMapping:
 
 
 def create_structured_grid_mapping(
-    grid: Grid,
-    right_direction_angle,
-    start_vertex=None,
-    angle_threshold=np.deg2rad(30)
+    grid: Grid, right_direction_angle, start_vertex=None, angle_threshold=np.deg2rad(30)
 ) -> GridMapping:
     # doesn't support pentagons!
 
@@ -331,48 +342,80 @@ def create_structured_grid_mapping(
         self_lon_lat = grid.v_lon_lat[vertex_id]
 
         # compute angles of neighbor vertices
-        vertices_angle = normalize_angle(get_angle(grid.v_lon_lat[vertex_ids] - self_lon_lat) - right_direction_angle)
-        vertices_nbh_ids = np.around(vertices_angle/(np.pi/3)).astype(int)
-        assert np.all(np.fabs(vertices_angle - vertices_nbh_ids*np.pi/3) <= angle_threshold)
+        vertices_angle = normalize_angle(
+            get_angle(grid.v_lon_lat[vertex_ids] - self_lon_lat) - right_direction_angle
+        )
+        vertices_nbh_ids = np.around(vertices_angle / (np.pi / 3)).astype(int)
+        assert np.all(
+            np.fabs(vertices_angle - vertices_nbh_ids * np.pi / 3) <= angle_threshold
+        )
 
         # compute angles of neighbor edges
-        edges_angle = normalize_angle(get_angle(grid.e_lon_lat[edge_ids] - self_lon_lat) - right_direction_angle)
-        edges_nbh_ids = np.around(edges_angle/(np.pi/3)).astype(int)
-        assert np.all(np.fabs(edges_angle - edges_nbh_ids*np.pi/3) <= angle_threshold)
+        edges_angle = normalize_angle(
+            get_angle(grid.e_lon_lat[edge_ids] - self_lon_lat) - right_direction_angle
+        )
+        edges_nbh_ids = np.around(edges_angle / (np.pi / 3)).astype(int)
+        assert np.all(
+            np.fabs(edges_angle - edges_nbh_ids * np.pi / 3) <= angle_threshold
+        )
 
         # compute angles of neighbor cells
         # (we rotate the cells by 30 degrees clock-wise (`-np.pi/6`) to get the angle id)
-        cells_angle = normalize_angle(get_angle(grid.c_lon_lat[cell_ids] - self_lon_lat) - right_direction_angle - np.pi/6)
-        cells_nbh_ids = np.around(cells_angle/(np.pi/3)).astype(int)
-        assert np.all(np.fabs(cells_angle - cells_nbh_ids*np.pi/3) <= angle_threshold)
+        cells_angle = normalize_angle(
+            get_angle(grid.c_lon_lat[cell_ids] - self_lon_lat)
+            - right_direction_angle
+            - np.pi / 6
+        )
+        cells_nbh_ids = np.around(cells_angle / (np.pi / 3)).astype(int)
+        assert np.all(
+            np.fabs(cells_angle - cells_nbh_ids * np.pi / 3) <= angle_threshold
+        )
 
         # update right direction angle
-        self_right_direction_angle = np.average(vertices_angle - vertices_nbh_ids*np.pi/3) + right_direction_angle
+        self_right_direction_angle = (
+            np.average(vertices_angle - vertices_nbh_ids * np.pi / 3)
+            + right_direction_angle
+        )
 
         # assign coordinates to vertex neighbors that don't have a coordinate yet
-        vertices_nbh_structured_coords = structured_v2v_offsets[vertices_nbh_ids] + np.array([[x, y]], dtype=int)
+        vertices_nbh_structured_coords = structured_v2v_offsets[
+            vertices_nbh_ids
+        ] + np.array([[x, y]], dtype=int)
         new_vertex_ids = np.all(np.isnan(vertex_mapping[vertex_ids, :]), axis=-1)
-        vertex_mapping[vertex_ids[new_vertex_ids], :] = vertices_nbh_structured_coords[new_vertex_ids]
+        vertex_mapping[vertex_ids[new_vertex_ids], :] = vertices_nbh_structured_coords[
+            new_vertex_ids
+        ]
         # check vertex neighbors that already had a coordinate, that they are consistent with the ones we computed here
         assert np.all(vertex_mapping[vertex_ids, :] == vertices_nbh_structured_coords)
 
         # assign coordinates to edge neighbors that don't have a coordinate yet
-        edges_nbh_structured_coords = structured_v2e_offsets[edges_nbh_ids] + np.array([[x, y, 0]], dtype=int)
+        edges_nbh_structured_coords = structured_v2e_offsets[edges_nbh_ids] + np.array(
+            [[x, y, 0]], dtype=int
+        )
         new_edge_ids = np.all(np.isnan(edge_mapping[edge_ids, :]), axis=-1)
-        edge_mapping[edge_ids[new_edge_ids], :] = edges_nbh_structured_coords[new_edge_ids]
+        edge_mapping[edge_ids[new_edge_ids], :] = edges_nbh_structured_coords[
+            new_edge_ids
+        ]
         # check edge neighbors that already had a coordinate, that they are consistent with the ones we computed here
         assert np.all(edge_mapping[edge_ids, :] == edges_nbh_structured_coords)
 
         # assign coordinates to cell neighbors that don't have a coordinate yet
-        cells_nbh_structured_coords = structured_v2c_offsets[cells_nbh_ids] + np.array([[x, y, 0]], dtype=int)
+        cells_nbh_structured_coords = structured_v2c_offsets[cells_nbh_ids] + np.array(
+            [[x, y, 0]], dtype=int
+        )
         new_cell_ids = np.all(np.isnan(cell_mapping[cell_ids, :]), axis=-1)
-        cell_mapping[cell_ids[new_cell_ids], :] = cells_nbh_structured_coords[new_cell_ids]
+        cell_mapping[cell_ids[new_cell_ids], :] = cells_nbh_structured_coords[
+            new_cell_ids
+        ]
         # check cell neighbors that already had a coordinate, that they are consistent with the ones we computed here
         assert np.all(cell_mapping[cell_ids, :] == cells_nbh_structured_coords)
 
         # continue bfs with vertices that have newly assigned coordinates
         # (use the updated right direction angle for them)
-        return {(int(next_vertex_id), self_right_direction_angle) for next_vertex_id in vertex_ids[new_vertex_ids]}
+        return {
+            (int(next_vertex_id), self_right_direction_angle)
+            for next_vertex_id in vertex_ids[new_vertex_ids]
+        }
 
     current = set()
     next = {(start_vertex, right_direction_angle)}
@@ -417,7 +460,9 @@ def argsort_simple(
 
     ids = list(range(start_idx, end_idx))
     ids.sort(key=cmp_to_key(lambda a, b: cmp(mapping[a, :], mapping[b, :])))
-    return np.concatenate((np.arange(start_idx), np.array(ids), np.arange(end_idx, total_end_idx)))
+    return np.concatenate(
+        (np.arange(start_idx), np.array(ids), np.arange(end_idx, total_end_idx))
+    )
 
 
 def revert_permutation(perm: np.ndarray) -> np.ndarray:
@@ -436,71 +481,101 @@ class SimpleRowMajorSorting:
     @staticmethod
     def edge_compare(a, b) -> int:
         if a[2] == 2 and b[2] != 2:
-            return b[1] - a[1] + 1/2
+            return b[1] - a[1] + 1 / 2
         if a[2] != 2 and b[2] == 2:
-            return b[1] - a[1] - 1/2
-        return (a[2] - b[2] if a[0] == b[0] else a[0] - b[0]) if b[1] == a[1] else b[1] - a[1]
+            return b[1] - a[1] - 1 / 2
+        return (
+            (a[2] - b[2] if a[0] == b[0] else a[0] - b[0])
+            if b[1] == a[1]
+            else b[1] - a[1]
+        )
 
     @staticmethod
     def cell_compare(a, b) -> int:
-        return (a[2] - b[2] if a[0] == b[0] else a[0] - b[0]) if b[1] == a[1] else b[1] - a[1]
+        return (
+            (a[2] - b[2] if a[0] == b[0] else a[0] - b[0])
+            if b[1] == a[1]
+            else b[1] - a[1]
+        )
+
 
 def do_reorder_grid(fname: str, schema: GridScheme):
-  grid_file = netCDF4.Dataset(fname)
-  grid = Grid.from_netCDF4(grid_file)
-  fname_mod = fname[:-3] + "_row-major.nc"
-  shutil.copy(fname, fname_mod)
-  grid_modified_file = netCDF4.Dataset(fname_mod, "r+")
-
-  # the line of the right direction angle for vertex #0:
-  p1 = np.array([[0.18511014, 0.79054856]])
-  p2 = np.array([[0.18593181, 0.79048109]])
-  right_direction_angle = np.squeeze(get_angle(p2 - p1))
-
-  mapping = create_structured_grid_mapping(grid, right_direction_angle, angle_threshold=np.deg2rad(15))  
-
-  v_grf = get_grf_ranges(grid, LocationType.Vertex)
-  e_grf = get_grf_ranges(grid, LocationType.Edge)
-  c_grf = get_grf_ranges(grid, LocationType.Cell)
-
-  v_perm = argsort_simple(mapping.vertex_mapping, SimpleRowMajorSorting.vertex_compare, v_grf[0])
-  e_perm = argsort_simple(mapping.edge_mapping, SimpleRowMajorSorting.edge_compare, e_grf[0])
-  c_perm = argsort_simple(mapping.cell_mapping, SimpleRowMajorSorting.cell_compare, c_grf[0])     
-
-  apply_permutation(grid_modified_file, c_perm, schema, LocationType.Cell)
-  apply_permutation(grid_modified_file, e_perm, schema, LocationType.Edge)
-  apply_permutation(grid_modified_file, v_perm, schema, LocationType.Vertex)      
-  
-  grid_modified_file.sync()
-
-def reorder_parent(fname):
-  do_reorder_grid(fname, ICON_grid_schema)
-
-def reorder_parent_grid(fname):
-  do_reorder_grid(fname, ICON_grid_schema_parent)
-
-def reorder_pool_folder():
-    grid_file = netCDF4.Dataset("grid.nc")
+    grid_file = netCDF4.Dataset(fname)
     grid = Grid.from_netCDF4(grid_file)
-    parent_grid_file = netCDF4.Dataset("grid.parent.nc")
-    parent_grid = Grid.from_netCDF4(parent_grid_file)
-   
-    shutil.copy("./grid.nc", "./grid_row-major.nc")
-    grid_modified_file = netCDF4.Dataset("./grid_row-major.nc", "r+")
-    shutil.copy("./grid.parent.nc", "./grid.parent_row-major.nc")
-    parent_grid_modified_file = netCDF4.Dataset("./grid.parent_row-major.nc", "r+")
-    shutil.copy("./lateral_boundary.grid.nc", "./lateral_boundary.grid_row-major.nc")
-    lateral_grid_modified_file = netCDF4.Dataset("./lateral_boundary.grid_row-major.nc", "r+")
-    shutil.copy("./igfff00000000.nc", "./igfff00000000_row-major.nc")
-    init_con_grid_file_modified_file = netCDF4.Dataset("./igfff00000000_row-major.nc", "r+")    
+    fname_mod = fname[:-3] + "_row-major.nc"
+    shutil.copy(fname, fname_mod)
+    grid_modified_file = netCDF4.Dataset(fname_mod, "r+")
 
     # the line of the right direction angle for vertex #0:
     p1 = np.array([[0.18511014, 0.79054856]])
     p2 = np.array([[0.18593181, 0.79048109]])
     right_direction_angle = np.squeeze(get_angle(p2 - p1))
 
-    mapping = create_structured_grid_mapping(grid, right_direction_angle, angle_threshold=np.deg2rad(15))
-    parent_mapping = create_structured_grid_mapping(parent_grid, right_direction_angle, angle_threshold=np.deg2rad(15))
+    mapping = create_structured_grid_mapping(
+        grid, right_direction_angle, angle_threshold=np.deg2rad(15)
+    )
+
+    v_grf = get_grf_ranges(grid, LocationType.Vertex)
+    e_grf = get_grf_ranges(grid, LocationType.Edge)
+    c_grf = get_grf_ranges(grid, LocationType.Cell)
+
+    v_perm = argsort_simple(
+        mapping.vertex_mapping, SimpleRowMajorSorting.vertex_compare, v_grf[0]
+    )
+    e_perm = argsort_simple(
+        mapping.edge_mapping, SimpleRowMajorSorting.edge_compare, e_grf[0]
+    )
+    c_perm = argsort_simple(
+        mapping.cell_mapping, SimpleRowMajorSorting.cell_compare, c_grf[0]
+    )
+
+    apply_permutation(grid_modified_file, c_perm, schema, LocationType.Cell)
+    apply_permutation(grid_modified_file, e_perm, schema, LocationType.Edge)
+    apply_permutation(grid_modified_file, v_perm, schema, LocationType.Vertex)
+
+    grid_modified_file.sync()
+
+
+def reorder_parent(fname):
+    do_reorder_grid(fname, ICON_grid_schema)
+
+
+def reorder_parent_grid(fname):
+    do_reorder_grid(fname, ICON_grid_schema_parent)
+
+
+def reorder_pool_folder(reorder_parent: bool):
+    grid_file = netCDF4.Dataset("grid.nc")
+    grid = Grid.from_netCDF4(grid_file)
+    parent_grid_file = netCDF4.Dataset("grid.parent.nc")
+    parent_grid = Grid.from_netCDF4(parent_grid_file)
+
+    shutil.copy("./grid.nc", "./grid_row-major.nc")
+    grid_modified_file = netCDF4.Dataset("./grid_row-major.nc", "r+")
+    shutil.copy("./grid.parent.nc", "./grid.parent_row-major.nc")
+    parent_grid_modified_file = netCDF4.Dataset("./grid.parent_row-major.nc", "r+")
+    shutil.copy("./lateral_boundary.grid.nc", "./lateral_boundary.grid_row-major.nc")
+    lateral_grid_modified_file = netCDF4.Dataset(
+        "./lateral_boundary.grid_row-major.nc", "r+"
+    )
+    shutil.copy("./igfff00000000.nc", "./igfff00000000_row-major.nc")
+    init_con_grid_file_modified_file = netCDF4.Dataset(
+        "./igfff00000000_row-major.nc", "r+"
+    )
+    shutil.copy("./extpar.nc", "./extpar_row-major.nc")
+    extpar_file_modified_file = netCDF4.Dataset("./extpar_row-major.nc", "r+")
+
+    # the line of the right direction angle for vertex #0:
+    p1 = np.array([[0.18511014, 0.79054856]])
+    p2 = np.array([[0.18593181, 0.79048109]])
+    right_direction_angle = np.squeeze(get_angle(p2 - p1))
+
+    mapping = create_structured_grid_mapping(
+        grid, right_direction_angle, angle_threshold=np.deg2rad(15)
+    )
+    parent_mapping = create_structured_grid_mapping(
+        parent_grid, right_direction_angle, angle_threshold=np.deg2rad(15)
+    )
 
     v_grf = get_grf_ranges(grid, LocationType.Vertex)
     e_grf = get_grf_ranges(grid, LocationType.Edge)
@@ -510,32 +585,75 @@ def reorder_pool_folder():
     parent_e_grf = get_grf_ranges(parent_grid, LocationType.Edge)
     parent_c_grf = get_grf_ranges(parent_grid, LocationType.Cell)
 
-    v_perm = argsort_simple(mapping.vertex_mapping, SimpleRowMajorSorting.vertex_compare, v_grf[0])
-    e_perm = argsort_simple(mapping.edge_mapping, SimpleRowMajorSorting.edge_compare, e_grf[0])
-    c_perm = argsort_simple(mapping.cell_mapping, SimpleRowMajorSorting.cell_compare, c_grf[0])   
+    v_perm = argsort_simple(
+        mapping.vertex_mapping, SimpleRowMajorSorting.vertex_compare, v_grf[0]
+    )
+    e_perm = argsort_simple(
+        mapping.edge_mapping, SimpleRowMajorSorting.edge_compare, e_grf[0]
+    )
+    c_perm = argsort_simple(
+        mapping.cell_mapping, SimpleRowMajorSorting.cell_compare, c_grf[0]
+    )
 
-    parent_v_perm = argsort_simple(parent_mapping.vertex_mapping, SimpleRowMajorSorting.vertex_compare, parent_v_grf[0])
-    parent_e_perm = argsort_simple(parent_mapping.edge_mapping, SimpleRowMajorSorting.edge_compare, parent_e_grf[0])
-    parent_c_perm = argsort_simple(parent_mapping.cell_mapping, SimpleRowMajorSorting.cell_compare, parent_c_grf[0])   
+    parent_v_perm = argsort_simple(
+        parent_mapping.vertex_mapping,
+        SimpleRowMajorSorting.vertex_compare,
+        parent_v_grf[0],
+    )
+    parent_e_perm = argsort_simple(
+        parent_mapping.edge_mapping, SimpleRowMajorSorting.edge_compare, parent_e_grf[0]
+    )
+    parent_c_perm = argsort_simple(
+        parent_mapping.cell_mapping, SimpleRowMajorSorting.cell_compare, parent_c_grf[0]
+    )
 
     apply_permutation(grid_modified_file, c_perm, ICON_grid_schema, LocationType.Cell)
     apply_permutation(grid_modified_file, e_perm, ICON_grid_schema, LocationType.Edge)
     apply_permutation(grid_modified_file, v_perm, ICON_grid_schema, LocationType.Vertex)
 
-    apply_permutation(parent_grid_modified_file, parent_c_perm, ICON_grid_schema_parent, LocationType.Cell)
-    apply_permutation(parent_grid_modified_file, parent_e_perm, ICON_grid_schema_parent, LocationType.Edge)
-    apply_permutation(parent_grid_modified_file, parent_v_perm, ICON_grid_schema_parent, LocationType.Vertex)
+    if reorder_parent:
+        apply_permutation(
+            parent_grid_modified_file,
+            parent_c_perm,
+            ICON_grid_schema_parent,
+            LocationType.Cell,
+        )
+        apply_permutation(
+            parent_grid_modified_file,
+            parent_e_perm,
+            ICON_grid_schema_parent,
+            LocationType.Edge,
+        )
+        apply_permutation(
+            parent_grid_modified_file,
+            parent_v_perm,
+            ICON_grid_schema_parent,
+            LocationType.Vertex,
+        )
 
-    apply_permutation_into_parent_grid(grid_modified_file, parent_c_perm, parent_e_perm, parent_v_perm, ICON_grid_schema)
+        apply_permutation_into_parent_grid(
+            grid_modified_file,
+            parent_c_perm,
+            parent_e_perm,
+            parent_v_perm,
+            ICON_grid_schema,
+        )
 
-    apply_permutation_latbc_grid(lateral_grid_modified_file, c_perm, e_perm, ICON_grid_schema_lat_grid)    
+    apply_permutation_latbc_grid(
+        lateral_grid_modified_file, c_perm, e_perm, ICON_grid_schema_lat_grid
+    )
 
-    apply_permutation(init_con_grid_file_modified_file, c_perm, ICON_grid_schema_ic, LocationType.Cell)
-    apply_permutation(init_con_grid_file_modified_file, e_perm, ICON_grid_schema_ic, LocationType.Edge)
-    apply_permutation(init_con_grid_file_modified_file, v_perm, ICON_grid_schema_ic, LocationType.Vertex)
-    
+    apply_permutation(
+        init_con_grid_file_modified_file, c_perm, ICON_grid_schema_ic, LocationType.Cell
+    )
+    apply_permutation(
+        extpar_file_modified_file, c_perm, ICON_grid_schema_extpar, LocationType.Cell
+    )
+    # apply_permutation(init_con_grid_file_modified_file, e_perm, ICON_grid_schema_ic, LocationType.Edge)
+    # apply_permutation(init_con_grid_file_modified_file, v_perm, ICON_grid_schema_ic, LocationType.Vertex)
+
     grid_modified_file.sync()
     parent_grid_modified_file.sync()
     lateral_grid_modified_file.sync()
-    init_con_grid_file_modified_file.sync()            
-
+    init_con_grid_file_modified_file.sync()
+    extpar_file_modified_file.sync()

@@ -96,11 +96,7 @@ def test_permutation(fname_a, fname_b):
 
     assert grid_a.nv == grid_b.nv
     assert grid_a.nc == grid_b.nc
-    assert grid_a.ne == grid_b.ne
-
-    nv = grid_a.nv
-    nc = grid_a.nc
-    ne = grid_a.ne
+    assert grid_a.ne == grid_b.ne    
 
     map_c = get_map(grid_a.c_lon_lat, grid_b.c_lon_lat)      
     map_v = get_map(grid_a.v_lon_lat, grid_b.v_lon_lat)   

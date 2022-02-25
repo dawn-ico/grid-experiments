@@ -54,7 +54,9 @@ def plot_vertices(ax, grid: Grid, field=None):
             es = es[es != DEVICE_MISSING_VALUE]
 
             vertex = grid.v_lon_lat[vi].reshape(1, 2)
-            points = np.concatenate((grid.c_lon_lat[cs], grid.e_lon_lat[es], vertex), axis=0)
+            points = np.concatenate(
+                (grid.c_lon_lat[cs], grid.e_lon_lat[es], vertex), axis=0
+            )
             center = np.average(points, axis=0)
             points = order_around(center, points)
 
@@ -95,11 +97,12 @@ def plot_edges(ax, grid: Grid, field=None):
 
     return collection
 
+
 def plot_grid(fname: str, location: LocationType):
     grid_file = netCDF4.Dataset(fname)
     grid = Grid.from_netCDF4(grid_file)
-    
-    fig, ax = plt.subplots()    
+
+    fig, ax = plt.subplots()
 
     if location is LocationType.Vertex:
         vertices = plot_vertices(ax, grid, field=np.arange(grid.nv))
@@ -119,13 +122,29 @@ def plot_grid(fname: str, location: LocationType):
         cells.set_edgecolor((0, 0, 0, 0))
         fig.colorbar(cells, ax=ax)
 
-    #ax.plot(grid.v_lon_lat[range_to_slice(v_grf[0]), 0], grid.v_lon_lat[range_to_slice(v_grf[0]), 1], 'o-')
-    #ax.plot(grid.e_lon_lat[range_to_slice(e_grf[0]), 0], grid.e_lon_lat[range_to_slice(e_grf[0]), 1], 'o-')
-    #ax.plot(grid.c_lon_lat[range_to_slice(c_grf[0]), 0], grid.c_lon_lat[range_to_slice(c_grf[0]), 1], 'o-')
+    # ax.plot(grid.v_lon_lat[range_to_slice(v_grf[0]), 0], grid.v_lon_lat[range_to_slice(v_grf[0]), 1], 'o-')
+    # ax.plot(grid.e_lon_lat[range_to_slice(e_grf[0]), 0], grid.e_lon_lat[range_to_slice(e_grf[0]), 1], 'o-')
+    # ax.plot(grid.c_lon_lat[range_to_slice(c_grf[0]), 0], grid.c_lon_lat[range_to_slice(c_grf[0]), 1], 'o-')
 
-    latbc_file = netCDF4.Dataset('igfff00000000_lbc.nc')
-    grid_latbc = GridLBC.from_netCDF4_lbc(latbc_file)
-    ax.plot(grid_latbc.c_lon_lat[:,0], grid_latbc.c_lon_lat[:,1], 'o-')
+    # ax.plot(grid.v_lon_lat[3908:4700, 0], grid.v_lon_lat[3908:4700, 1], "o-")
+
+    # plot some onions
+    # ax.plot(grid.c_lon_lat[0:814, 0], grid.c_lon_lat[0:814, 1], "o")
+    # ax.plot(grid.c_lon_lat[815:1613, 0], grid.c_lon_lat[815:1613, 1], "o")
+    # ax.plot(grid.c_lon_lat[1613:2397, 0], grid.c_lon_lat[1613:2397, 1], "o")
+    # ax.plot(grid.c_lon_lat[2398:3160, 0], grid.c_lon_lat[2398:3160, 1], "o")
+    # ax.plot(grid.c_lon_lat[3160:3908, 0], grid.c_lon_lat[3160:3908, 1], "o")
+    # ax.plot(grid.c_lon_lat[3908:4709, 0], grid.c_lon_lat[3908:4709, 1], "o")
+
+    # ax.plot(grid.c_lon_lat[:812, 0], grid.c_lon_lat[:812, 1], "o-")
+
+    # latbc_file = netCDF4.Dataset("igfff00000000_lbc.nc")
+    # grid_latbc = GridLBC.from_netCDF4_lbc(latbc_file)
+    # ax.plot(grid_latbc.c_lon_lat[:, 0], grid_latbc.c_lon_lat[:, 1], "o")
+
+    # rm_grid = netCDF4.Dataset("grid_row-major.nc")
+    # grid_latbc = GridLBC.from_netCDF4_lbc(rm_grid)
+    # ax.plot(grid_latbc.c_lon_lat[:812, 0], grid_latbc.c_lon_lat[:812, 1], "o-")
 
     ax.autoscale()
     plt.show()
