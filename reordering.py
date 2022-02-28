@@ -37,11 +37,12 @@ def apply_permutation(
 
             array = array + 1
 
-        if field_name == "T":
-            print("adding 10 kelvin")
-            field[:] = array + 10
-        else:
-            field[:] = array
+        # if field_name == "T":
+        #     print("adding 10 kelvin")
+        #     field[:] = array + 10
+        # else:
+        #     field[:] = array
+        field[:] = array
 
 
 def apply_permutation_latbc_grid(
@@ -547,13 +548,18 @@ def reorder_parent_grid(fname):
 def reorder_pool_folder(reorder_parent: bool):
     grid_file = netCDF4.Dataset("grid.nc")
     grid = Grid.from_netCDF4(grid_file)
-    parent_grid_file = netCDF4.Dataset("grid.parent.nc")
-    parent_grid = Grid.from_netCDF4(parent_grid_file)
+
+    if reorder_parent:
+        parent_grid_file = netCDF4.Dataset("grid.parent.nc")
+        parent_grid = Grid.from_netCDF4(parent_grid_file)
 
     shutil.copy("./grid.nc", "./grid_row-major.nc")
     grid_modified_file = netCDF4.Dataset("./grid_row-major.nc", "r+")
-    shutil.copy("./grid.parent.nc", "./grid.parent_row-major.nc")
-    parent_grid_modified_file = netCDF4.Dataset("./grid.parent_row-major.nc", "r+")
+
+    if reorder_parent:
+        shutil.copy("./grid.parent.nc", "./grid.parent_row-major.nc")
+        parent_grid_modified_file = netCDF4.Dataset("./grid.parent_row-major.nc", "r+")
+
     shutil.copy("./lateral_boundary.grid.nc", "./lateral_boundary.grid_row-major.nc")
     lateral_grid_modified_file = netCDF4.Dataset(
         "./lateral_boundary.grid_row-major.nc", "r+"
@@ -573,17 +579,19 @@ def reorder_pool_folder(reorder_parent: bool):
     mapping = create_structured_grid_mapping(
         grid, right_direction_angle, angle_threshold=np.deg2rad(15)
     )
-    parent_mapping = create_structured_grid_mapping(
-        parent_grid, right_direction_angle, angle_threshold=np.deg2rad(15)
-    )
+    if reorder_parent:
+        parent_mapping = create_structured_grid_mapping(
+            parent_grid, right_direction_angle, angle_threshold=np.deg2rad(15)
+        )
 
     v_grf = get_grf_ranges(grid, LocationType.Vertex)
     e_grf = get_grf_ranges(grid, LocationType.Edge)
     c_grf = get_grf_ranges(grid, LocationType.Cell)
 
-    parent_v_grf = get_grf_ranges(parent_grid, LocationType.Vertex)
-    parent_e_grf = get_grf_ranges(parent_grid, LocationType.Edge)
-    parent_c_grf = get_grf_ranges(parent_grid, LocationType.Cell)
+    if reorder_parent:
+        parent_v_grf = get_grf_ranges(parent_grid, LocationType.Vertex)
+        parent_e_grf = get_grf_ranges(parent_grid, LocationType.Edge)
+        parent_c_grf = get_grf_ranges(parent_grid, LocationType.Cell)
 
     v_perm = argsort_simple(
         mapping.vertex_mapping, SimpleRowMajorSorting.vertex_compare, v_grf[0]
@@ -595,21 +603,32 @@ def reorder_pool_folder(reorder_parent: bool):
         mapping.cell_mapping, SimpleRowMajorSorting.cell_compare, c_grf[0]
     )
 
-    parent_v_perm = argsort_simple(
-        parent_mapping.vertex_mapping,
-        SimpleRowMajorSorting.vertex_compare,
-        parent_v_grf[0],
-    )
-    parent_e_perm = argsort_simple(
-        parent_mapping.edge_mapping, SimpleRowMajorSorting.edge_compare, parent_e_grf[0]
-    )
-    parent_c_perm = argsort_simple(
-        parent_mapping.cell_mapping, SimpleRowMajorSorting.cell_compare, parent_c_grf[0]
-    )
+    if reorder_parent:
+        parent_v_perm = argsort_simple(
+            parent_mapping.vertex_mapping,
+            SimpleRowMajorSorting.vertex_compare,
+            parent_v_grf[0],
+        )
+        parent_e_perm = argsort_simple(
+            parent_mapping.edge_mapping,
+            SimpleRowMajorSorting.edge_compare,
+            parent_e_grf[0],
+        )
+        parent_c_perm = argsort_simple(
+            parent_mapping.cell_mapping,
+            SimpleRowMajorSorting.cell_compare,
+            parent_c_grf[0],
+        )
 
-    apply_permutation(grid_modified_file, c_perm, ICON_grid_schema, LocationType.Cell)
-    apply_permutation(grid_modified_file, e_perm, ICON_grid_schema, LocationType.Edge)
-    apply_permutation(grid_modified_file, v_perm, ICON_grid_schema, LocationType.Vertex)
+    apply_permutation(
+        grid_modified_file, c_perm, ICON_grid_schema_dbg, LocationType.Cell
+    )
+    apply_permutation(
+        grid_modified_file, e_perm, ICON_grid_schema_dbg, LocationType.Edge
+    )
+    apply_permutation(
+        grid_modified_file, v_perm, ICON_grid_schema_dbg, LocationType.Vertex
+    )
 
     if reorder_parent:
         apply_permutation(
@@ -653,7 +672,8 @@ def reorder_pool_folder(reorder_parent: bool):
     # apply_permutation(init_con_grid_file_modified_file, v_perm, ICON_grid_schema_ic, LocationType.Vertex)
 
     grid_modified_file.sync()
-    parent_grid_modified_file.sync()
+    if reorder_parent:
+        parent_grid_modified_file.sync()
     lateral_grid_modified_file.sync()
     init_con_grid_file_modified_file.sync()
     extpar_file_modified_file.sync()
