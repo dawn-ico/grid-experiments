@@ -187,32 +187,8 @@ def test_init_cond(fname_a, fname_b, ifname_a, ifname_b):
         assert np.isclose(T_a[i], T_b[map_c[i]])
 
 
-def plot_diff(fname_a, fname_b):
-    grid_a = netCDF4.Dataset(fname_a)
-    grid_b = netCDF4.Dataset(fname_b)
-
-    clon_res = grid_a.variables["clon"]
-    clat_res = grid_a.variables["clat"]
-    T_res = grid_a.variables["ta"][0, 64, :]
-
-    ta = np.copy(T_res[:])
-    tx = np.copy(clon_res[:])
-    ty = np.copy(clat_res[:])
-
-    fig, ax = plt.subplots()
-
-    ax.scatter(tx, ty, c=ta)
-    ax.autoscale()
-    plt.show()
-
-
 if __name__ == "__main__":
-    # test_permutation("grid.nc", "grid_row-major.nc")
+    test_permutation("grid.nc", "grid_row-major.nc")
     # test_init_cond(
     #     "grid.nc", "grid_row-major.nc", "igfff00000000.nc", "igfff00000000_row-major.nc"
     # )
-
-    plot_diff(
-        "/scratch/mroeth/icon-nwp-new/build/experiments/mch_ch_r04b09/mch_ch_r04b09_atm_3d_ml_20180921T000000Z.nc",
-        "/scratch/mroeth/icon-nwp-new/build/experiments/mch_ch_r04b09_sf/mch_ch_r04b09_atm_3d_ml_20180921T000000Z.nc",
-    )

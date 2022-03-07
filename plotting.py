@@ -146,5 +146,11 @@ def plot_grid(fname: str, location: LocationType):
     # grid_latbc = GridLBC.from_netCDF4_lbc(rm_grid)
     # ax.plot(grid_latbc.c_lon_lat[:812, 0], grid_latbc.c_lon_lat[:812, 1], "o-")
 
+    ax.plot(grid.c_lon_lat[-8:, 0], grid.c_lon_lat[-8:, 1], "ro")
+
     ax.autoscale()
     plt.show()
+
+
+if __name__ == "__main__":
+    plot_grid("grid_row-major.nc", LocationType.Cell)

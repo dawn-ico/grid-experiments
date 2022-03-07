@@ -291,6 +291,7 @@ ICON_grid_schema_dbg = make_schema(
     # int end_idx_c(max_chdom=1, cell_grf=14);
     #   :long_name = "list of end indices for each refinement control level for cells";
     #   :cdi = "ignore";
+    end_idx_c=FieldDescriptor(),
     # int refin_e_ctrl(edge=30715);
     #   :long_name = "refinement control flag for edges";
     #   :cdi = "ignore";
@@ -301,6 +302,7 @@ ICON_grid_schema_dbg = make_schema(
     # int end_idx_e(max_chdom=1, edge_grf=24);
     #   :long_name = "list of end indices for each refinement control level for edges";
     #   :cdi = "ignore";
+    end_idx_e=FieldDescriptor(),
     # int refin_v_ctrl(vertex=10376);
     #   :long_name = "refinement control flag for vertices";
     #   :cdi = "ignore";
@@ -311,6 +313,7 @@ ICON_grid_schema_dbg = make_schema(
     # int end_idx_v(max_chdom=1, vert_grf=13);
     #   :long_name = "list of end indices for each refinement control level for vertices";
     #   :cdi = "ignore";
+    end_idx_v=FieldDescriptor(),
     # int parent_edge_index(edge=30715);
     #   :long_name = "parent edge index";
     #   :cdi = "ignore";
