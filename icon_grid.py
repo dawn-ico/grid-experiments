@@ -21,7 +21,6 @@ def reset_to_icon(grid_set: GridSet, fix_hole_in_grid: bool):
     grid_set.copy_to_pool()
 
 
-# FIXME add argument parsing
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="reorder icon grids")
     parser.add_argument(
