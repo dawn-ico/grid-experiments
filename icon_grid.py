@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from __future__ import annotations
 
-import shutil
+import argparse
 
 from reordering import reorder_pool_folder, fix_hole
 from grid_types import GridSet
@@ -23,7 +23,24 @@ def reset_to_icon(grid_set: GridSet, fix_hole_in_grid: bool):
 
 # FIXME add argument parsing
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="reorder icon grids")
+    parser.add_argument(
+        "--row_major", action="store_true", help="place row major grids in pool folder"
+    )
+    parser.add_argument(
+        "--icon", action="store_true", help="place icon grids in pool folder"
+    )
+    parser.add_argument(
+        "--fix_hole", action="store_true", help="fix hole present in icon grid"
+    )
+    args = parser.parse_args()
+
+    if not args.icon and not args.row_major:
+        parser.error("either chose icon or row major grids")
+
     grid_set = GridSet("/scratch/mroeth/icon-nwp-new/my_pool/data/ICON/mch")
 
-    # row_major_permutation(grid_set, fix_hole_in_grid=True)
-    reset_to_icon(grid_set, fix_hole_in_grid=True)
+    if args.icon:
+        reset_to_icon(grid_set, fix_hole_in_grid=args.fix_hole)
+    else:
+        row_major_permutation(grid_set, fix_hole_in_grid=args.fix_hole)
