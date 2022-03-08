@@ -79,24 +79,18 @@ class GridSet:
         self.pool_folder = pool_folder
 
         self.grid = GridFile(
-            fname="grid",
-            folder="grids/ch_r04b09",
-            schema=ICON_grid_schema
+            fname="grid", folder="grids/ch_r04b09", schema=ICON_grid_schema
         )
         self.lateral_boundary_grid = GridFile(
             fname="lateral_boundary.grid",
             folder="input/ch_r04b09",
-            schema=ICON_grid_schema_lat_grid
+            schema=ICON_grid_schema_lat_grid,
         )
         self.initial_conditions = GridFile(
-            fname="igfff00000000",
-            folder="input/ch_r04b09",
-            schema=ICON_grid_schema_ic
+            fname="igfff00000000", folder="input/ch_r04b09", schema=ICON_grid_schema_ic
         )
         self.extpar = GridFile(
-            fname="extpar",
-            folder="grids/ch_r04b09",
-            schema=ICON_grid_schema_extpar
+            fname="extpar", folder="grids/ch_r04b09", schema=ICON_grid_schema_extpar
         )
 
         self._grids = [
@@ -118,16 +112,20 @@ class GridSet:
             )
 
     def copy_to_pool(self, suffix: str = ""):
+        if suffix is not "":
+            suffix = "_" + suffix
         for grid_file in self:
             shutil.copy(
-                f"{grid_file.fname}_{suffix}.nc",
+                f"{grid_file.fname}{suffix}.nc",
                 f"{self.pool_folder}/{grid_file.folder}/{grid_file.fname}.nc",
             )
 
     def make_data_sets(self, suffix: str = ""):
+        if suffix is not "":
+            suffix = "_" + suffix
         for grid_file in self:
-            shutil.copy(f"{grid_file.fname}.nc", f"{grid_file.fname}_{suffix}.nc")
-            grid_file.data_set = netCDF4.Dataset(f"{grid_file.fname}_{suffix}.nc", "r+")
+            shutil.copy(f"{grid_file.fname}.nc", f"{grid_file.fname}{suffix}.nc")
+            grid_file.data_set = netCDF4.Dataset(f"{grid_file.fname}{suffix}.nc", "r+")
 
     def sync_data_sets(self):
         for grid_file in self:

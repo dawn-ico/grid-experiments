@@ -15,10 +15,11 @@ def row_major_permutation(grid_set: GridSet, fix_hole_in_grid: bool):
 
 def reset_to_icon(grid_set: GridSet, fix_hole_in_grid: bool):
     grid_set.copy_to_staging()
-    grid_set.make_data_sets()
+    grid_set.make_data_sets("tmp")
     if fix_hole_in_grid:
         fix_hole(grid_set.grid.data_set, grid_set.grid.schema)
-    grid_set.copy_to_pool()
+    grid_set.sync_data_sets()
+    grid_set.copy_to_pool("tmp")
 
 
 if __name__ == "__main__":
@@ -37,7 +38,7 @@ if __name__ == "__main__":
     if not args.icon and not args.row_major:
         parser.error("either chose icon or row major grids")
 
-    grid_set = GridSet("/scratch/mroeth/icon-nwp-new/my_pool/data/ICON/mch")
+    grid_set = GridSet("my_pool/data/ICON/mch")
 
     if args.icon:
         reset_to_icon(grid_set, fix_hole_in_grid=args.fix_hole)

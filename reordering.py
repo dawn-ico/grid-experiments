@@ -60,14 +60,12 @@ def fix_hole(ncf, schema: GridScheme):
             field[:] = array
 
         if field_name == "end_idx_v":
-            array[0, 7] == nv
+            array[0, 7] = nv
             field[:] = array
 
         if field_name == "end_idx_e":
-            array[0, 13] == ne
+            array[0, 13] = ne
             field[:] = array
-
-        field[:] = array
 
 
 def get_grf_ranges(grid: Grid, location_type: LocationType = LocationType.Cell):
@@ -472,7 +470,7 @@ def reorder_pool_folder(grid_set: GridSet, fix_hole_in_grid: bool):
     grid_file = netCDF4.Dataset(grid_set.grid.fname + ".nc")
     grid = Grid.from_netCDF4(grid_file)
 
-    grid_set.make_data_sets()
+    grid_set.make_data_sets("row-major")
 
     # the line of the right direction angle for vertex #0:
     p1 = np.array([[0.18511014, 0.79054856]])
