@@ -1,4 +1,5 @@
-from grid_types import Grid, LocationType, DEVICE_MISSING_VALUE
+from grid_types import Grid, DEVICE_MISSING_VALUE, GridSet
+from location_type import LocationType
 from schemas import *
 
 import numpy as np
@@ -19,14 +20,17 @@ def apply_permutation(
         field = ncf.variables[field_name]
         array = np.copy(field[:])
 
-        if descr.location_type is location_type:
+        if (
+            descr.location_type is location_type
+            and not descr.do_not_reorder_primary_loc
+        ):
             if 1 < len(array.shape):
                 assert descr.primary_axis is not None
                 array = np.take(array, perm, axis=descr.primary_axis)
             else:
                 array = array[perm]
 
-        if descr.indexes_into is location_type:
+        if descr.indexes_into is location_type and not descr.do_not_reorder_indexes:
             # go from fortran's 1-based indexing to python's 0-based indexing
             array = array - 1
 
@@ -40,87 +44,30 @@ def apply_permutation(
         field[:] = array
 
 
-def do_fix_hole(ncf, schema: GridScheme):
+def fix_hole(ncf, schema: GridScheme):
     for field_name, descr in schema.items():
 
         field = ncf.variables[field_name]
         array = np.copy(field[:])
 
+        nc = ncf.dimensions["cell"].size
+        ne = ncf.dimensions["edge"].size
+        nv = ncf.dimensions["vertex"].size
+
+        # FIXME: this seems extremely brittle
         if field_name == "end_idx_c":
-            for i in range(0, array.shape[1]):
-                if array[0, i] == 20332:
-                    array[0, i] = 20340
-                    print("fix cell hole")
+            array[0, 8] = nc
             field[:] = array
+
         if field_name == "end_idx_v":
-            for i in range(0, array.shape[1]):
-                if array[0, i] == 10374:
-                    array[0, i] = 10376
-                    print("fix vertex hole")
+            array[0, 7] == nv
             field[:] = array
+
         if field_name == "end_idx_e":
-            for i in range(0, array.shape[1]):
-                if array[0, i] == 30709:
-                    array[0, i] = 30715
-                    print("fix edge hole")
+            array[0, 13] == ne
             field[:] = array
 
-
-def apply_permutation_latbc_grid(
-    ncf,
-    perm_cells: np.ndarray,
-    perm_edges: np.ndarray,
-    schema: GridScheme,
-) -> None:
-    for field_name, descr in schema.items():
-        field = ncf.variables[field_name]
-        array = np.copy(field[:])
-
-        if field_name == "global_edge_index":
-            rev_perm = revert_permutation(perm_edges)
-            array = array - 1
-            field[:] = rev_perm[array] + 1
-
-        if field_name == "global_cell_index":
-            rev_perm = revert_permutation(perm_cells)
-            array = array - 1
-            field[:] = rev_perm[array] + 1
-
-
-def apply_permutation_into_parent_grid(
-    ncf,
-    perm_cells_parent: np.ndarray,
-    perm_edges_parent: np.ndarray,
-    perm_vertex_parent: np.ndarray,
-    schema: GridScheme,
-):
-
-    rev_perm_cell = revert_permutation(perm_cells_parent)
-    rev_perm_edges = revert_permutation(perm_edges_parent)
-    rev_perm_vertex = revert_permutation(perm_vertex_parent)
-
-    for field_name, descr in schema.items():
-        field = ncf.variables[field_name]
-        array = np.copy(field[:])
-
-        array = array - 1
-
-        if field_name == "parent_cell_idx":
-            missing_values = array == DEVICE_MISSING_VALUE
-            array = rev_perm_cell[array]
-            array[missing_values] = DEVICE_MISSING_VALUE
-
-        if field_name == "parent_edges_idx":
-            missing_values = array == DEVICE_MISSING_VALUE
-            array = rev_perm_edges[array]
-            array[missing_values] = DEVICE_MISSING_VALUE
-
-        if field_name == "parent_vertex_idx":
-            missing_values = array == DEVICE_MISSING_VALUE
-            array = rev_perm_vertex[array]
-            array[missing_values] = DEVICE_MISSING_VALUE
-
-        field[:] = array + 1
+        field[:] = array
 
 
 def get_grf_ranges(grid: Grid, location_type: LocationType = LocationType.Cell):
@@ -521,40 +468,11 @@ class SimpleRowMajorSorting:
         )
 
 
-def fix_hole_reference():
-    shutil.copy("./grid.nc", "./grid_fixed.nc")
-    grid_modified_file = netCDF4.Dataset("./grid_fixed.nc", "r+")
-
-    do_fix_hole(grid_modified_file, ICON_grid_schema_dbg)
-
-    grid_modified_file.sync()
-
-
-def reorder_pool_folder(reorder_parent: bool, fix_hole: bool):
-    grid_file = netCDF4.Dataset("grid.nc")
+def reorder_pool_folder(grid_set: GridSet, fix_hole_in_grid: bool):
+    grid_file = netCDF4.Dataset(grid_set.grid.fname + ".nc")
     grid = Grid.from_netCDF4(grid_file)
 
-    if reorder_parent:
-        parent_grid_file = netCDF4.Dataset("grid.parent.nc")
-        parent_grid = Grid.from_netCDF4(parent_grid_file)
-
-    shutil.copy("./grid.nc", "./grid_row-major.nc")
-    grid_modified_file = netCDF4.Dataset("./grid_row-major.nc", "r+")
-
-    if reorder_parent:
-        shutil.copy("./grid.parent.nc", "./grid.parent_row-major.nc")
-        parent_grid_modified_file = netCDF4.Dataset("./grid.parent_row-major.nc", "r+")
-
-    shutil.copy("./lateral_boundary.grid.nc", "./lateral_boundary.grid_row-major.nc")
-    lateral_grid_modified_file = netCDF4.Dataset(
-        "./lateral_boundary.grid_row-major.nc", "r+"
-    )
-    shutil.copy("./igfff00000000.nc", "./igfff00000000_row-major.nc")
-    init_con_grid_file_modified_file = netCDF4.Dataset(
-        "./igfff00000000_row-major.nc", "r+"
-    )
-    shutil.copy("./extpar.nc", "./extpar_row-major.nc")
-    extpar_file_modified_file = netCDF4.Dataset("./extpar_row-major.nc", "r+")
+    grid_set.make_data_sets()
 
     # the line of the right direction angle for vertex #0:
     p1 = np.array([[0.18511014, 0.79054856]])
@@ -564,19 +482,10 @@ def reorder_pool_folder(reorder_parent: bool, fix_hole: bool):
     mapping = create_structured_grid_mapping(
         grid, right_direction_angle, angle_threshold=np.deg2rad(15)
     )
-    if reorder_parent:
-        parent_mapping = create_structured_grid_mapping(
-            parent_grid, right_direction_angle, angle_threshold=np.deg2rad(15)
-        )
 
     v_grf = get_grf_ranges(grid, LocationType.Vertex)
     e_grf = get_grf_ranges(grid, LocationType.Edge)
     c_grf = get_grf_ranges(grid, LocationType.Cell)
-
-    if reorder_parent:
-        parent_v_grf = get_grf_ranges(parent_grid, LocationType.Vertex)
-        parent_e_grf = get_grf_ranges(parent_grid, LocationType.Edge)
-        parent_c_grf = get_grf_ranges(parent_grid, LocationType.Cell)
 
     v_perm = argsort_simple(
         mapping.vertex_mapping, SimpleRowMajorSorting.vertex_compare, v_grf[0]
@@ -588,78 +497,12 @@ def reorder_pool_folder(reorder_parent: bool, fix_hole: bool):
         mapping.cell_mapping, SimpleRowMajorSorting.cell_compare, c_grf[0]
     )
 
-    if reorder_parent:
-        parent_v_perm = argsort_simple(
-            parent_mapping.vertex_mapping,
-            SimpleRowMajorSorting.vertex_compare,
-            parent_v_grf[0],
-        )
-        parent_e_perm = argsort_simple(
-            parent_mapping.edge_mapping,
-            SimpleRowMajorSorting.edge_compare,
-            parent_e_grf[0],
-        )
-        parent_c_perm = argsort_simple(
-            parent_mapping.cell_mapping,
-            SimpleRowMajorSorting.cell_compare,
-            parent_c_grf[0],
-        )
+    for grid in grid_set:
+        apply_permutation(grid.data_set, c_perm, grid.schema, LocationType.Cell)
+        apply_permutation(grid.data_set, e_perm, grid.schema, LocationType.Edge)
+        apply_permutation(grid.data_set, v_perm, grid.schema, LocationType.Vertex)
 
-    apply_permutation(
-        grid_modified_file, c_perm, ICON_grid_schema_dbg, LocationType.Cell
-    )
-    apply_permutation(
-        grid_modified_file, e_perm, ICON_grid_schema_dbg, LocationType.Edge
-    )
-    apply_permutation(
-        grid_modified_file, v_perm, ICON_grid_schema_dbg, LocationType.Vertex
-    )
+    if fix_hole_in_grid:
+        fix_hole(grid_set.grid.data_set, grid_set.grid.schema)
 
-    if reorder_parent:
-        apply_permutation(
-            parent_grid_modified_file,
-            parent_c_perm,
-            ICON_grid_schema_parent,
-            LocationType.Cell,
-        )
-        apply_permutation(
-            parent_grid_modified_file,
-            parent_e_perm,
-            ICON_grid_schema_parent,
-            LocationType.Edge,
-        )
-        apply_permutation(
-            parent_grid_modified_file,
-            parent_v_perm,
-            ICON_grid_schema_parent,
-            LocationType.Vertex,
-        )
-
-        apply_permutation_into_parent_grid(
-            grid_modified_file,
-            parent_c_perm,
-            parent_e_perm,
-            parent_v_perm,
-            ICON_grid_schema,
-        )
-
-    apply_permutation_latbc_grid(
-        lateral_grid_modified_file, c_perm, e_perm, ICON_grid_schema_lat_grid
-    )
-
-    apply_permutation(
-        init_con_grid_file_modified_file, c_perm, ICON_grid_schema_ic, LocationType.Cell
-    )
-    apply_permutation(
-        extpar_file_modified_file, c_perm, ICON_grid_schema_extpar, LocationType.Cell
-    )
-
-    if fix_hole:
-        do_fix_hole(grid_modified_file, ICON_grid_schema_dbg)
-
-    grid_modified_file.sync()
-    if reorder_parent:
-        parent_grid_modified_file.sync()
-    lateral_grid_modified_file.sync()
-    init_con_grid_file_modified_file.sync()
-    extpar_file_modified_file.sync()
+    grid_set.sync_data_sets()

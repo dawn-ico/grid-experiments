@@ -1,10 +1,21 @@
 from __future__ import annotations
 
+from schemas import (
+    GridScheme,
+    ICON_grid_schema,
+    ICON_grid_schema_extpar,
+    ICON_grid_schema_ic,
+    ICON_grid_schema_lat_grid,
+)
+
 import numpy as np
 import dataclasses
-import enum
+import shutil
+import netCDF4
+
 
 DEVICE_MISSING_VALUE = -2
+
 
 @dataclasses.dataclass
 class Grid:
@@ -27,7 +38,6 @@ class Grid:
 
     @staticmethod
     def from_netCDF4(ncf) -> Grid:
-
         def get_dim(name) -> int:
             return ncf.dimensions[name].size
 
@@ -47,28 +57,78 @@ class Grid:
             e2c=get_var("adjacent_cell_of_edge") - 1,
             c2v=get_var("vertex_of_cell") - 1,
             c2e=get_var("edge_of_cell") - 1,
-            v_grf=np.concatenate((get_var("start_idx_v"), get_var("end_idx_v")), axis=1) - 1,
-            e_grf=np.concatenate((get_var("start_idx_e"), get_var("end_idx_e")), axis=1) - 1,
-            c_grf=np.concatenate((get_var("start_idx_c"), get_var("end_idx_c")), axis=1) - 1,
+            v_grf=np.concatenate((get_var("start_idx_v"), get_var("end_idx_v")), axis=1)
+            - 1,
+            e_grf=np.concatenate((get_var("start_idx_e"), get_var("end_idx_e")), axis=1)
+            - 1,
+            c_grf=np.concatenate((get_var("start_idx_c"), get_var("end_idx_c")), axis=1)
+            - 1,
         )
+
 
 @dataclasses.dataclass
-class GridLBC:
-   
-    c_lon_lat: np.ndarray
+class GridFile:
+    fname: str
+    folder: str
+    schema: GridScheme
+    data_set = None
 
-    @staticmethod
-    def from_netCDF4_lbc(ncf) -> GridLBC:
 
-        def get_var(name) -> np.ndarray:
-            return np.array(ncf.variables[name][:].T)
+class GridSet:
+    def __init__(self, pool_folder: str):
+        self.pool_folder = pool_folder
 
-        return GridLBC(
-            c_lon_lat=np.stack((get_var("clon"), get_var("clat")), axis=1),
+        self.grid = GridFile(
+            fname="grid",
+            folder="grids/ch_r04b09",
+            schema=ICON_grid_schema
+        )
+        self.lateral_boundary_grid = GridFile(
+            fname="lateral_boundary.grid",
+            folder="input/ch_r04b09",
+            schema=ICON_grid_schema_lat_grid
+        )
+        self.initial_conditions = GridFile(
+            fname="igfff00000000",
+            folder="input/ch_r04b09",
+            schema=ICON_grid_schema_ic
+        )
+        self.extpar = GridFile(
+            fname="extpar",
+            folder="grids/ch_r04b09",
+            schema=ICON_grid_schema_extpar
         )
 
+        self._grids = [
+            self.grid,
+            self.lateral_boundary_grid,
+            self.initial_conditions,
+            self.extpar,
+        ]
 
-class LocationType(enum.Enum):
-    Vertex = enum.auto()
-    Edge = enum.auto()
-    Cell = enum.auto()
+    def __iter__(self):
+        for each in self._grids:
+            yield each
+
+    def copy_to_staging(self):
+        for grid_file in self:
+            shutil.copy(
+                f"{self.pool_folder}/{grid_file.folder}/{grid_file.fname}_icon.nc",
+                f"{grid_file.fname}.nc",
+            )
+
+    def copy_to_pool(self, suffix: str = ""):
+        for grid_file in self:
+            shutil.copy(
+                f"{grid_file.fname}_{suffix}.nc",
+                f"{self.pool_folder}/{grid_file.folder}/{grid_file.fname}.nc",
+            )
+
+    def make_data_sets(self, suffix: str = ""):
+        for grid_file in self:
+            shutil.copy(f"{grid_file.fname}.nc", f"{grid_file.fname}_{suffix}.nc")
+            grid_file.data_set = netCDF4.Dataset(f"{grid_file.fname}_{suffix}.nc", "r+")
+
+    def sync_data_sets(self):
+        for grid_file in self:
+            grid_file.data_set.sync()

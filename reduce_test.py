@@ -10,7 +10,10 @@ from matplotlib import (
     collections,
 )
 
+# the purpose of this class was to ensure that the neighbor lists are correct after having been resorted. its not used to resort meshes
 
+
+# quick and simple spatial hasher which allows to co-locate points without external knowlege and without n^2 operations
 class SpatialHasher:
     def _insert(self, px, py, idx):
         i = math.floor((px - self.lox) / self.dx)
@@ -36,6 +39,8 @@ class SpatialHasher:
 
         self.points = points
 
+    # check neighboring cells because of floating point arithmetic
+    # (loading and saving from netcdf seems to affect float precision)
     def find(self, px, py):
         i = max(math.floor((px - self.lox) / self.dx), 0)
         j = max(math.floor((py - self.loy) / self.dy), 0)
@@ -49,6 +54,9 @@ class SpatialHasher:
         return None
 
 
+# use the spatial hasher to get a map from grid_a to grid_b
+#   precondition: grid_a and grid_b are equal, but only differ in the relative order
+#                 of elements
 def get_map(grid_a_lon_lat: np.ndarray, grid_b_lon_lat: np.ndarray):
     v_hasher = SpatialHasher(grid_b_lon_lat)
     a_to_b = []
@@ -60,6 +68,7 @@ def get_map(grid_a_lon_lat: np.ndarray, grid_b_lon_lat: np.ndarray):
     return a_to_b
 
 
+# perform a reduction on grid a, grid b, check that all results are equal
 def reduce_test(grid_a_x2y, grid_b_x2y, map, grid_a_field, grid_b_field):
     errors = 0
     correct = 0
@@ -93,6 +102,8 @@ def reduce_test(grid_a_x2y, grid_b_x2y, map, grid_a_field, grid_b_field):
     return (correct, errors)
 
 
+# test that all nbh permutations are valid by performing a reduction
+# for each neighbor list
 def test_permutation(fname_a, fname_b):
 
     grid_file_a = netCDF4.Dataset(fname_a)
@@ -135,60 +146,5 @@ def test_permutation(fname_a, fname_b):
     print(f"c2v: corr: {correct} err: {errors}")
 
 
-def test_init_cond(fname_a, fname_b, ifname_a, ifname_b):
-    grid_file_a = netCDF4.Dataset(fname_a)
-    grid_a = Grid.from_netCDF4(grid_file_a)
-
-    grid_file_b = netCDF4.Dataset(fname_b)
-    grid_b = Grid.from_netCDF4(grid_file_b)
-
-    init_cond_a = netCDF4.Dataset(ifname_a)
-    init_cond_b = netCDF4.Dataset(ifname_b)
-
-    assert grid_a.nc == grid_b.nc
-
-    map_c = get_map(grid_a.c_lon_lat, grid_b.c_lon_lat)
-
-    clon_a = init_cond_a.variables["clon"]
-    clat_a = init_cond_a.variables["clat"]
-
-    clon_b = init_cond_b.variables["clon"]
-    clat_b = init_cond_b.variables["clat"]
-
-    T_a = init_cond_a.variables["T"][0, 89, :]
-    T_b = init_cond_b.variables["T"][0, 89, :]
-
-    result_grid = netCDF4.Dataset(
-        "/scratch/mroeth/icon-nwp-new/build/experiments/mch_ch_r04b09/mch_ch_r04b09_atm_3d_ml_20180921T000000Z.nc"
-    )
-
-    clon_res = result_grid.variables["clon"]
-    clat_res = result_grid.variables["clat"]
-    T_res = result_grid.variables["ta"][0, 64, :]
-
-    fig, (ax1, ax2) = plt.subplots(1, 2)
-    test = np.copy(T_b[:])
-    tx = np.copy(clon_res[:])
-    ty = np.copy(clat_res[:])
-    # ax.plot(clon_res, clat_res)
-    ax1.scatter(tx, ty, c=T_res)
-    ax1.autoscale()
-    ax2.scatter(tx, ty, c=T_a)
-    ax2.autoscale()
-    plt.show()
-
-    for i in range(0, grid_a.nc):
-        assert np.isclose(clon_a[i], clon_b[map_c[i]])
-        assert np.isclose(clat_a[i], clat_b[map_c[i]])
-
-        assert np.isclose(clon_a[i], clon_res[map_c[i]])
-        assert np.isclose(clat_a[i], clat_res[map_c[i]])
-
-        assert np.isclose(T_a[i], T_b[map_c[i]])
-
-
 if __name__ == "__main__":
     test_permutation("grid.nc", "grid_row-major.nc")
-    # test_init_cond(
-    #     "grid.nc", "grid_row-major.nc", "igfff00000000.nc", "igfff00000000_row-major.nc"
-    # )

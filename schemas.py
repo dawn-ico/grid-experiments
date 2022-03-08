@@ -2,7 +2,7 @@ from __future__ import annotations
 import typing
 import dataclasses
 
-from grid_types import LocationType
+from location_type import LocationType
 
 
 @dataclasses.dataclass
@@ -13,6 +13,8 @@ class FieldDescriptor:
     # some fields that have a `location_type` are transposed
     # (only needed with `location_type` and if the field is more than one dimensional)
     primary_axis: typing.Optional[int] = None
+    do_not_reorder_primary_loc: bool = False
+    do_not_reorder_indexes: bool = False
 
 
 GridScheme = typing.Dict[str, FieldDescriptor]
@@ -23,122 +25,6 @@ def make_schema(**fields: FieldDescriptor) -> GridScheme:
 
 
 ICON_grid_schema = make_schema(
-    # FIXME: make sure this is complete
-    ###########################################################################
-    # grid topology and lon/lat coordinates
-    ###########################################################################
-    vlon=FieldDescriptor(location_type=LocationType.Vertex),
-    vlat=FieldDescriptor(location_type=LocationType.Vertex),
-    # v2v
-    vertices_of_vertex=FieldDescriptor(
-        primary_axis=1,
-        location_type=LocationType.Vertex,
-        indexes_into=LocationType.Vertex,
-    ),
-    # v2e
-    edges_of_vertex=FieldDescriptor(
-        primary_axis=1,
-        location_type=LocationType.Vertex,
-        indexes_into=LocationType.Edge,
-    ),
-    # v2c
-    cells_of_vertex=FieldDescriptor(
-        primary_axis=1,
-        location_type=LocationType.Vertex,
-        indexes_into=LocationType.Cell,
-    ),
-    elon=FieldDescriptor(location_type=LocationType.Edge),
-    elat=FieldDescriptor(location_type=LocationType.Edge),
-    # e2v
-    edge_vertices=FieldDescriptor(
-        primary_axis=1,
-        location_type=LocationType.Edge,
-        indexes_into=LocationType.Vertex,
-    ),
-    # e2c
-    adjacent_cell_of_edge=FieldDescriptor(
-        primary_axis=1,
-        location_type=LocationType.Edge,
-        indexes_into=LocationType.Cell,
-    ),
-    clon=FieldDescriptor(location_type=LocationType.Cell),
-    clat=FieldDescriptor(location_type=LocationType.Cell),
-    # c2v
-    vertex_of_cell=FieldDescriptor(
-        primary_axis=1,
-        location_type=LocationType.Cell,
-        indexes_into=LocationType.Vertex,
-    ),
-    # c2e
-    edge_of_cell=FieldDescriptor(
-        primary_axis=1,
-        location_type=LocationType.Cell,
-        indexes_into=LocationType.Edge,
-    ),
-    # c2c
-    neighbor_cell_index=FieldDescriptor(
-        primary_axis=1,
-        location_type=LocationType.Cell,
-        indexes_into=LocationType.Cell,
-    ),
-    ###########################################################################
-    # other vertex fields
-    ###########################################################################
-    cartesian_x_vertices=FieldDescriptor(location_type=LocationType.Vertex),
-    cartesian_y_vertices=FieldDescriptor(location_type=LocationType.Vertex),
-    cartesian_z_vertices=FieldDescriptor(location_type=LocationType.Vertex),
-    dual_area=FieldDescriptor(location_type=LocationType.Vertex),
-    longitude_vertices=FieldDescriptor(location_type=LocationType.Vertex),
-    latitude_vertices=FieldDescriptor(location_type=LocationType.Vertex),
-    dual_area_p=FieldDescriptor(location_type=LocationType.Vertex),
-    vlon_vertices=FieldDescriptor(primary_axis=0, location_type=LocationType.Vertex),
-    vlat_vertices=FieldDescriptor(primary_axis=0, location_type=LocationType.Vertex),
-    # FIXME: will this work just like this?
-    edge_orientation=FieldDescriptor(primary_axis=1, location_type=LocationType.Vertex),
-    refin_v_ctrl=FieldDescriptor(location_type=LocationType.Vertex),
-    parent_vertex_index=FieldDescriptor(location_type=LocationType.Vertex),
-    ###########################################################################
-    # other edge fields
-    ###########################################################################
-    lon_edge_centre=FieldDescriptor(location_type=LocationType.Edge),
-    lat_edge_centre=FieldDescriptor(location_type=LocationType.Edge),
-    edge_length=FieldDescriptor(location_type=LocationType.Edge),
-    edge_cell_distance=FieldDescriptor(primary_axis=1, location_type=LocationType.Edge),
-    dual_edge_length=FieldDescriptor(location_type=LocationType.Edge),
-    edge_vert_distance=FieldDescriptor(primary_axis=1, location_type=LocationType.Edge),
-    zonal_normal_primal_edge=FieldDescriptor(location_type=LocationType.Edge),
-    meridional_normal_primal_edge=FieldDescriptor(location_type=LocationType.Edge),
-    zonal_normal_dual_edge=FieldDescriptor(location_type=LocationType.Edge),
-    meridional_normal_dual_edge=FieldDescriptor(location_type=LocationType.Edge),
-    edge_system_orientation=FieldDescriptor(location_type=LocationType.Edge),
-    elon_vertices=FieldDescriptor(primary_axis=0, location_type=LocationType.Edge),
-    elat_vertices=FieldDescriptor(primary_axis=0, location_type=LocationType.Edge),
-    quadrilateral_area=FieldDescriptor(location_type=LocationType.Edge),
-    refin_e_ctrl=FieldDescriptor(location_type=LocationType.Edge),
-    parent_edge_index=FieldDescriptor(location_type=LocationType.Edge),
-    ###########################################################################
-    # other cell fields
-    ###########################################################################
-    cell_area=FieldDescriptor(location_type=LocationType.Cell),
-    lon_cell_centre=FieldDescriptor(location_type=LocationType.Cell),
-    lat_cell_centre=FieldDescriptor(location_type=LocationType.Cell),
-    cell_area_p=FieldDescriptor(location_type=LocationType.Cell),
-    orientation_of_normal=FieldDescriptor(
-        primary_axis=1, location_type=LocationType.Cell
-    ),
-    clon_vertices=FieldDescriptor(
-        primary_axis=0,
-        location_type=LocationType.Cell,
-    ),
-    clat_vertices=FieldDescriptor(
-        primary_axis=0,
-        location_type=LocationType.Cell,
-    ),
-    parent_cell_index=FieldDescriptor(location_type=LocationType.Cell),
-    refin_c_ctrl=FieldDescriptor(location_type=LocationType.Cell),
-)
-
-ICON_grid_schema_dbg = make_schema(
     #   double clon(cell=20340);
     #   :units = "radian";
     #   :standard_name = "grid_longitude";
@@ -194,7 +80,9 @@ ICON_grid_schema_dbg = make_schema(
     lat_edge_centre=FieldDescriptor(location_type=LocationType.Edge),
     # int edge_of_cell(nv=3, cell=20340);
     edge_of_cell=FieldDescriptor(
-        location_type=LocationType.Cell, indexes_into=LocationType.Edge, primary_axis=1
+        location_type=LocationType.Cell,
+        indexes_into=LocationType.Edge,
+        primary_axis=1,
     ),
     # int vertex_of_cell(nv=3, cell=20340);
     vertex_of_cell=FieldDescriptor(
@@ -204,7 +92,9 @@ ICON_grid_schema_dbg = make_schema(
     ),
     # int adjacent_cell_of_edge(nc=2, edge=30715);
     adjacent_cell_of_edge=FieldDescriptor(
-        location_type=LocationType.Edge, indexes_into=LocationType.Cell, primary_axis=1
+        location_type=LocationType.Edge,
+        indexes_into=LocationType.Cell,
+        primary_axis=1,
     ),
     # int edge_vertices(nc=2, edge=30715);
     edge_vertices=FieldDescriptor(
@@ -275,7 +165,9 @@ ICON_grid_schema_dbg = make_schema(
     parent_cell_index=FieldDescriptor(location_type=LocationType.Cell),
     # int neighbor_cell_index(nv=3, cell=20340);
     neighbor_cell_index=FieldDescriptor(
-        location_type=LocationType.Cell, indexes_into=LocationType.Cell, primary_axis=1
+        location_type=LocationType.Cell,
+        indexes_into=LocationType.Cell,
+        primary_axis=1,
     ),
     # int edge_orientation(ne=6, vertex=10376);
     edge_orientation=FieldDescriptor(location_type=LocationType.Vertex, primary_axis=1),
@@ -378,7 +270,9 @@ ICON_grid_schema_parent = make_schema(
     lat_edge_centre=FieldDescriptor(location_type=LocationType.Edge),
     # int edge_of_cell(nv=3, cell=20340);
     edge_of_cell=FieldDescriptor(
-        location_type=LocationType.Cell, indexes_into=LocationType.Edge, primary_axis=1
+        location_type=LocationType.Cell,
+        indexes_into=LocationType.Edge,
+        primary_axis=1,
     ),
     # int vertex_of_cell(nv=3, cell=20340);
     vertex_of_cell=FieldDescriptor(
@@ -388,7 +282,9 @@ ICON_grid_schema_parent = make_schema(
     ),
     # int adjacent_cell_of_edge(nc=2, edge=30715);
     adjacent_cell_of_edge=FieldDescriptor(
-        location_type=LocationType.Edge, indexes_into=LocationType.Cell, primary_axis=1
+        location_type=LocationType.Edge,
+        indexes_into=LocationType.Cell,
+        primary_axis=1,
     ),
     # int edge_vertices(nc=2, edge=30715);
     edge_vertices=FieldDescriptor(
@@ -455,7 +351,9 @@ ICON_grid_schema_parent = make_schema(
     quadrilateral_area=FieldDescriptor(location_type=LocationType.Edge),
     # int neighbor_cell_index(nv=3, cell=20340);
     neighbor_cell_index=FieldDescriptor(
-        location_type=LocationType.Cell, indexes_into=LocationType.Cell, primary_axis=1
+        location_type=LocationType.Cell,
+        indexes_into=LocationType.Cell,
+        primary_axis=1,
     ),
     # int edge_orientation(ne=6, vertex=10376);
     edge_orientation=FieldDescriptor(location_type=LocationType.Vertex, primary_axis=1),
@@ -498,73 +396,101 @@ ICON_grid_schema_lat_grid = make_schema(
     #   :units = "radian";
     #   :standard_name = "grid_longitude";
     #   :bounds = "clon_vertices";
-    clon=FieldDescriptor(location_type=LocationType.Cell),
+    clon=FieldDescriptor(
+        location_type=LocationType.Cell, do_not_reorder_primary_loc=True
+    ),
     # double clat(cell=9868);
     #   :units = "radian";
     #   :standard_name = "grid_latitude";
     #   :bounds = "clat_vertices";
-    clat=FieldDescriptor(location_type=LocationType.Cell),
+    clat=FieldDescriptor(
+        location_type=LocationType.Cell, do_not_reorder_primary_loc=True
+    ),
     # double vlon(vertex=5287);
     #   :units = "radian";
     #   :standard_name = "grid_longitude";
     #   :bounds = "vlon_vertices";
-    vlon=FieldDescriptor(location_type=LocationType.Vertex),
+    vlon=FieldDescriptor(
+        location_type=LocationType.Vertex, do_not_reorder_primary_loc=True
+    ),
     # double vlat(vertex=5287);
     #   :units = "radian";
     #   :standard_name = "grid_latitude";
     #   :bounds = "vlat_vertices";
-    vlat=FieldDescriptor(location_type=LocationType.Vertex),
+    vlat=FieldDescriptor(
+        location_type=LocationType.Vertex, do_not_reorder_primary_loc=True
+    ),
     # double elon(edge=15155);
     #   :units = "radian";
     #   :standard_name = "grid_longitude";
     #   :bounds = "elon_vertices";
-    elon=FieldDescriptor(location_type=LocationType.Edge),
+    elon=FieldDescriptor(
+        location_type=LocationType.Edge, do_not_reorder_primary_loc=True
+    ),
     # double elat(edge=15155);
     #   :units = "radian";
     #   :standard_name = "grid_latitude";
     #   :bounds = "elat_vertices";
-    elat=FieldDescriptor(location_type=LocationType.Edge),
+    elat=FieldDescriptor(
+        location_type=LocationType.Edge, do_not_reorder_primary_loc=True
+    ),
     # double longitude_vertices(vertex=5287);
     #   :coordinates = "vlon vlat";
-    longitude_vertices=FieldDescriptor(location_type=LocationType.Vertex),
+    longitude_vertices=FieldDescriptor(
+        location_type=LocationType.Vertex, do_not_reorder_primary_loc=True
+    ),
     # double latitude_vertices(vertex=5287);
     #   :coordinates = "vlon vlat";
-    latitude_vertices=FieldDescriptor(location_type=LocationType.Vertex),
+    latitude_vertices=FieldDescriptor(
+        location_type=LocationType.Vertex, do_not_reorder_primary_loc=True
+    ),
     # double clon_vertices(cell=9868, nv=3);
     clon_vertices=FieldDescriptor(
         primary_axis=0,
         location_type=LocationType.Cell,
+        do_not_reorder_primary_loc=True,
     ),
     # double clat_vertices(cell=9868, nv=3);
     clat_vertices=FieldDescriptor(
         primary_axis=0,
         location_type=LocationType.Cell,
+        do_not_reorder_primary_loc=True,
     ),
     # double vlon_vertices(vertex=5287, ne=6);
     vlon_vertices=FieldDescriptor(
         primary_axis=0,
         location_type=LocationType.Vertex,
+        do_not_reorder_primary_loc=True,
     ),
     # double vlat_vertices(vertex=5287, ne=6);
     vlat_vertices=FieldDescriptor(
         primary_axis=0,
         location_type=LocationType.Vertex,
+        do_not_reorder_primary_loc=True,
     ),
     # double cell_area(cell=9868);
     #   :coordinates = "clon clat";
-    cell_area=FieldDescriptor(location_type=LocationType.Cell),
+    cell_area=FieldDescriptor(
+        location_type=LocationType.Cell, do_not_reorder_primary_loc=True
+    ),
     # double lon_edge_centre(edge=15155);
     #   :cdi = "ignore";
-    lon_edge_centre=FieldDescriptor(location_type=LocationType.Edge),
+    lon_edge_centre=FieldDescriptor(
+        location_type=LocationType.Edge, do_not_reorder_primary_loc=True
+    ),
     # double lat_edge_centre(edge=15155);
     #   :cdi = "ignore";
-    lat_edge_centre=FieldDescriptor(location_type=LocationType.Edge),
+    lat_edge_centre=FieldDescriptor(
+        location_type=LocationType.Edge, do_not_reorder_primary_loc=True
+    ),
     # int edge_of_cell(nv=3, cell=9868);
     #   :cdi = "ignore";
     edge_of_cell=FieldDescriptor(
         primary_axis=1,
         location_type=LocationType.Cell,
         indexes_into=LocationType.Edge,
+        do_not_reorder_primary_loc=True,
+        do_not_reorder_indexes=True,
     ),
     # int vertex_of_cell(nv=3, cell=9868);
     #   :cdi = "ignore";
@@ -572,6 +498,8 @@ ICON_grid_schema_lat_grid = make_schema(
         primary_axis=1,
         location_type=LocationType.Cell,
         indexes_into=LocationType.Vertex,
+        do_not_reorder_primary_loc=True,
+        do_not_reorder_indexes=True,
     ),
     # int adjacent_cell_of_edge(nc=2, edge=15155);
     #   :cdi = "ignore";
@@ -579,6 +507,8 @@ ICON_grid_schema_lat_grid = make_schema(
         primary_axis=1,
         location_type=LocationType.Edge,
         indexes_into=LocationType.Cell,
+        do_not_reorder_primary_loc=True,
+        do_not_reorder_indexes=True,
     ),
     # int edge_vertices(nc=2, edge=15155);
     #   :cdi = "ignore";
@@ -586,6 +516,8 @@ ICON_grid_schema_lat_grid = make_schema(
         primary_axis=1,
         location_type=LocationType.Edge,
         indexes_into=LocationType.Vertex,
+        do_not_reorder_primary_loc=True,
+        do_not_reorder_indexes=True,
     ),
     # int cells_of_vertex(ne=6, vertex=5287);
     #   :cdi = "ignore";
@@ -593,22 +525,32 @@ ICON_grid_schema_lat_grid = make_schema(
         primary_axis=1,
         location_type=LocationType.Vertex,
         indexes_into=LocationType.Cell,
+        do_not_reorder_primary_loc=True,
+        do_not_reorder_indexes=True,
     ),
     # double edge_length(edge=15155);
     #   :coordinates = "elon elat";
-    edge_length=FieldDescriptor(location_type=LocationType.Edge),
+    edge_length=FieldDescriptor(
+        location_type=LocationType.Edge, do_not_reorder_primary_loc=True
+    ),
     # double zonal_normal_primal_edge(edge=15155);
     #   :cdi = "ignore";
-    zonal_normal_primal_edge=FieldDescriptor(location_type=LocationType.Edge),
+    zonal_normal_primal_edge=FieldDescriptor(
+        location_type=LocationType.Edge, do_not_reorder_primary_loc=True
+    ),
     # double meridional_normal_primal_edge(edge=15155);
     #   :cdi = "ignore";
-    meridional_normal_primal_edge=FieldDescriptor(location_type=LocationType.Edge),
+    meridional_normal_primal_edge=FieldDescriptor(
+        location_type=LocationType.Edge, do_not_reorder_primary_loc=True
+    ),
     # int neighbor_cell_index(nv=3, cell=9868);
     #   :cdi = "ignore";
     neighbor_cell_index=FieldDescriptor(
         primary_axis=1,
         location_type=LocationType.Cell,
         indexes_into=LocationType.Cell,
+        do_not_reorder_primary_loc=True,
+        do_not_reorder_indexes=True,
     ),
     # int global_cell_index(cell=9868);
     #   :cdi = "ignore";
@@ -616,6 +558,7 @@ ICON_grid_schema_lat_grid = make_schema(
     global_cell_index=FieldDescriptor(
         location_type=LocationType.Cell,
         indexes_into=LocationType.Cell,  # NOTE: this maps into cells of grid.nc, not lateral_boundary.grid.nc
+        do_not_reorder_primary_loc=True,
     ),
     # int global_edge_index(edge=15155);
     #   :cdi = "ignore";
@@ -623,6 +566,7 @@ ICON_grid_schema_lat_grid = make_schema(
     global_edge_index=FieldDescriptor(
         location_type=LocationType.Edge,
         indexes_into=LocationType.Edge,  # NOTE: this maps into cells of grid.nc, not lateral_boundary.grid.nc
+        do_not_reorder_primary_loc=True,
     ),
 )
 

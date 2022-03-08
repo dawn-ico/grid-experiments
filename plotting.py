@@ -1,4 +1,5 @@
-from grid_types import Grid, GridLBC, LocationType, DEVICE_MISSING_VALUE
+from grid_types import Grid, DEVICE_MISSING_VALUE
+from location_type import LocationType
 import numpy as np
 from matplotlib import (
     pyplot as plt,
@@ -122,11 +123,10 @@ def plot_grid(fname: str, location: LocationType):
         cells.set_edgecolor((0, 0, 0, 0))
         fig.colorbar(cells, ax=ax)
 
+    # plot "trace" of elements
     # ax.plot(grid.v_lon_lat[range_to_slice(v_grf[0]), 0], grid.v_lon_lat[range_to_slice(v_grf[0]), 1], 'o-')
     # ax.plot(grid.e_lon_lat[range_to_slice(e_grf[0]), 0], grid.e_lon_lat[range_to_slice(e_grf[0]), 1], 'o-')
     # ax.plot(grid.c_lon_lat[range_to_slice(c_grf[0]), 0], grid.c_lon_lat[range_to_slice(c_grf[0]), 1], 'o-')
-
-    # ax.plot(grid.v_lon_lat[3908:4700, 0], grid.v_lon_lat[3908:4700, 1], "o-")
 
     # plot some onions
     # ax.plot(grid.c_lon_lat[0:814, 0], grid.c_lon_lat[0:814, 1], "o")
@@ -134,19 +134,15 @@ def plot_grid(fname: str, location: LocationType):
     # ax.plot(grid.c_lon_lat[1613:2397, 0], grid.c_lon_lat[1613:2397, 1], "o")
     # ax.plot(grid.c_lon_lat[2398:3160, 0], grid.c_lon_lat[2398:3160, 1], "o")
     # ax.plot(grid.c_lon_lat[3160:3908, 0], grid.c_lon_lat[3160:3908, 1], "o")
-    # ax.plot(grid.c_lon_lat[3908:4709, 0], grid.c_lon_lat[3908:4709, 1], "o")
+    # ax.plot(grid.c_lon_lat[3908:4709, 0], grid.c_lon_lat[3908:4709, 1], "o") #not an onion anymore
 
-    # ax.plot(grid.c_lon_lat[:812, 0], grid.c_lon_lat[:812, 1], "o-")
-
+    # plot lateral boundary condition
     # latbc_file = netCDF4.Dataset("igfff00000000_lbc.nc")
     # grid_latbc = GridLBC.from_netCDF4_lbc(latbc_file)
     # ax.plot(grid_latbc.c_lon_lat[:, 0], grid_latbc.c_lon_lat[:, 1], "o")
 
-    # rm_grid = netCDF4.Dataset("grid_row-major.nc")
-    # grid_latbc = GridLBC.from_netCDF4_lbc(rm_grid)
-    # ax.plot(grid_latbc.c_lon_lat[:812, 0], grid_latbc.c_lon_lat[:812, 1], "o-")
-
-    ax.plot(grid.c_lon_lat[-8:, 0], grid.c_lon_lat[-8:, 1], "ro")
+    # plot the location of the cell hole
+    # ax.plot(grid.c_lon_lat[-8:, 0], grid.c_lon_lat[-8:, 1], "ro")
 
     ax.autoscale()
     plt.show()

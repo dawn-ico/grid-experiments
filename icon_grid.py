@@ -3,63 +3,27 @@ from __future__ import annotations
 
 import shutil
 
-from reordering import reorder_pool_folder, fix_hole_reference
-from plotting import plot_grid
-from grid_types import LocationType
-from reduce_test import test_permutation
+from reordering import reorder_pool_folder, fix_hole
+from grid_types import GridSet
 
 
-def row_major_permutation_pool(reorder_parent_grid: bool, fix_hole: bool):
-    shutil.copy("../my_pool/data/ICON/mch/grids/ch_r04b09/grid_icon.nc", "grid.nc")
-    if reorder_parent_grid:
-        shutil.copy(
-            "../my_pool/data/ICON/mch/grids/ch_r04b09/grid.parent_icon.nc",
-            "grid.parent.nc",
-        )
-    shutil.copy("../my_pool/data/ICON/mch/grids/ch_r04b09/extpar_icon.nc", "extpar.nc")
-    shutil.copy(
-        "../my_pool/data/ICON/mch/input/ch_r04b09/lateral_boundary.grid_icon.nc",
-        "lateral_boundary.grid.nc",
-    )
-    shutil.copy(
-        "../my_pool/data/ICON/mch/input/ch_r04b09/igfff00000000_icon.nc",
-        "igfff00000000.nc",
-    )
-
-    reorder_pool_folder(reorder_parent=reorder_parent_grid, fix_hole=fix_hole)
-
-    shutil.copy("grid_row-major.nc", "../my_pool/data/ICON/mch/grids/ch_r04b09/grid.nc")
-    if reorder_parent_grid:
-        shutil.copy(
-            "grid.parent_row-major.nc",
-            "../my_pool/data/ICON/mch/grids/ch_r04b09/grid.parent.nc",
-        )
-    shutil.copy(
-        "lateral_boundary.grid_row-major.nc",
-        "../my_pool/data/ICON/mch/input/ch_r04b09/lateral_boundary.grid.nc",
-    )
-    shutil.copy(
-        "igfff00000000_row-major.nc",
-        "../my_pool/data/ICON/mch/input/ch_r04b09/igfff00000000.nc",
-    )
-    shutil.copy(
-        "extpar_row-major.nc", "../my_pool/data/ICON/mch/grids/ch_r04b09/extpar.nc"
-    )
+def row_major_permutation(grid_set: GridSet, fix_hole_in_grid: bool):
+    grid_set.copy_to_staging()
+    reorder_pool_folder(grid_set, fix_hole_in_grid=fix_hole_in_grid)
+    grid_set.copy_to_pool("row-major")
 
 
-def fix_grid_in_reference():
-    shutil.copy("../my_pool/data/ICON/mch/grids/ch_r04b09/grid_icon.nc", "grid.nc")
+def reset_to_icon(grid_set: GridSet, fix_hole_in_grid: bool):
+    grid_set.copy_to_staging()
+    grid_set.make_data_sets()
+    if fix_hole_in_grid:
+        fix_hole(grid_set.grid.data_set, grid_set.grid.schema)
+    grid_set.copy_to_pool()
 
-    fix_hole_reference()
 
-    shutil.copy("grid_fixed.nc", "../my_pool/data/ICON/mch/grids/ch_r04b09/grid.nc")
-
-
+# FIXME add argument parsing
 if __name__ == "__main__":
-    # fix_grid_in_reference()
-    row_major_permutation_pool(reorder_parent_grid=False, fix_hole=True)
-    # plot_grid(
-    #     "grid.nc",
-    #     LocationType.Cell,
-    # )
-    # test_permutation("grid.nc", "grid_row-major.nc")
+    grid_set = GridSet("/scratch/mroeth/icon-nwp-new/my_pool/data/ICON/mch")
+
+    # row_major_permutation(grid_set, fix_hole_in_grid=True)
+    reset_to_icon(grid_set, fix_hole_in_grid=True)
