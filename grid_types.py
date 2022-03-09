@@ -112,8 +112,7 @@ class GridSet:
             )
 
     def copy_to_pool(self, suffix: str = ""):
-        if suffix is not "":
-            suffix = "_" + suffix
+        suffix = "_" + suffix if suffix is not "" else suffix
         for grid_file in self:
             shutil.copy(
                 f"{grid_file.fname}{suffix}.nc",
@@ -121,8 +120,7 @@ class GridSet:
             )
 
     def make_data_sets(self, suffix: str = ""):
-        if suffix is not "":
-            suffix = "_" + suffix
+        suffix = "_" + suffix if suffix is not "" else suffix
         for grid_file in self:
             shutil.copy(f"{grid_file.fname}.nc", f"{grid_file.fname}{suffix}.nc")
             grid_file.data_set = netCDF4.Dataset(f"{grid_file.fname}{suffix}.nc", "r+")

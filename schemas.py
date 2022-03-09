@@ -13,6 +13,8 @@ class FieldDescriptor:
     # some fields that have a `location_type` are transposed
     # (only needed with `location_type` and if the field is more than one dimensional)
     primary_axis: typing.Optional[int] = None
+    # some fields need to be safe guarded against reordering, e.g. the lateral boundary should
+    # stay in place
     do_not_reorder_primary_loc: bool = False
     do_not_reorder_indexes: bool = False
 

@@ -3,7 +3,6 @@ from location_type import LocationType
 from schemas import *
 
 import numpy as np
-import shutil
 import netCDF4
 from functools import cmp_to_key
 
@@ -54,7 +53,7 @@ def fix_hole(ncf, schema: GridScheme):
         ne = ncf.dimensions["edge"].size
         nv = ncf.dimensions["vertex"].size
 
-        # FIXME: this seems extremely brittle
+        # NOTE: this seems extremely brittle, but not sure how to improve
         if field_name == "end_idx_c":
             array[0, 8] = nc
             field[:] = array
