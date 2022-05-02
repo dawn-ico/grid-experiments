@@ -1,10 +1,19 @@
+from numpy import ndarray
+from regex import F
 from grid_types import Grid, DEVICE_MISSING_VALUE, GridSet
 from location_type import LocationType
 from schemas import *
+import pymorton.pymorton as pm
 
 import numpy as np
 import netCDF4
 from functools import cmp_to_key
+
+from matplotlib import (
+    pyplot as plt,
+    patches,
+    collections,
+)
 
 NaN = float("nan")
 
@@ -465,11 +474,47 @@ class SimpleRowMajorSorting:
         )
 
 
-def reorder_pool_folder(grid_set: GridSet, fix_hole_in_grid: bool):
+def assign_ij(positions: ndarray, 
+              idx_range: typing.Tuple[typing.Optional[int], typing.Optional[int]] = (None, None),
+              stagger: bool = False):
+    start_idx, end_idx = idx_range
+    curx = positions[start_idx,0]       
+    ij = -np.ones_like(positions)
+
+    tresh = 0.01
+    
+    i,j = 0   
+    for piter in range(start_idx, end_idx-1):       
+        ij[piter,:] = [i,j]       
+
+        # peek and reset if next is on next element is on next line
+        nextx = positions[piter+1, 0]
+        if abs(nextx-curx) > tresh:
+            j = j+1
+            i = 0        
+
+        # stagger edge lines (every other edge line has twice the amount of edges)
+        i = i + 2 if stagger and j%2 == 1 else i+1
+        x = curx
+    
+    ij[-1,:] = [i,j]
+    return ij
+
+def morton(cartesian: ndarray, idx_range: typing.Tuple[typing.Optional[int], typing.Optional[int]] = (None, None)):
+    start_idx, end_idx = idx_range
+    n = cartesian.shape[0]
+    perm = np.arange(0, n)
+    for iter in range(start_idx, end_idx):       
+        zorder = pm.interleave(int(cartesian[iter,0]), int(cartesian[iter,1]))
+        perm[iter] = start_idx + zorder
+    return perm
+
+def reorder_pool_folder(grid_set: GridSet, fix_hole_in_grid: bool, apply_morton: bool):
     grid_file = netCDF4.Dataset(grid_set.grid.fname + ".nc")
     grid = Grid.from_netCDF4(grid_file)
 
-    grid_set.make_data_sets("row-major")
+    suffix = "row-major" if not apply_morton else "morton"
+    grid_set.make_data_sets(suffix)
 
     # the line of the right direction angle for vertex #0:
     p1 = np.array([[0.18511014, 0.79054856]])
@@ -494,10 +539,45 @@ def reorder_pool_folder(grid_set: GridSet, fix_hole_in_grid: bool):
         mapping.cell_mapping, SimpleRowMajorSorting.cell_compare, c_grf[0]
     )
 
-    for grid in grid_set:
-        apply_permutation(grid.data_set, c_perm, grid.schema, LocationType.Cell)
-        apply_permutation(grid.data_set, e_perm, grid.schema, LocationType.Edge)
-        apply_permutation(grid.data_set, v_perm, grid.schema, LocationType.Vertex)
+    for cur_grid in grid_set:
+        apply_permutation(cur_grid.data_set, c_perm, cur_grid.schema, LocationType.Cell)
+        apply_permutation(cur_grid.data_set, e_perm, cur_grid.schema, LocationType.Edge)
+        apply_permutation(cur_grid.data_set, v_perm, cur_grid.schema, LocationType.Vertex)
+
+    if apply_morton:
+        c_lonlat_rm = np.take(grid.c_lon_lat, c_perm, axis=0)
+        e_lonlat_rm = np.take(grid.e_lon_lat, e_perm, axis=0)
+        v_lonlat_rm = np.take(grid.v_lon_lat, v_perm, axis=0)
+
+        # assign i,j values
+        c_ij = assign_ij(c_lonlat_rm, c_grf[0])
+        e_ij = assign_ij(e_lonlat_rm, e_grf[0], stagger = True)
+        v_ij = assign_ij(v_lonlat_rm, v_grf[0])
+
+        # cartesian i,j --> morton
+        c_zorder = morton(c_ij, c_grf[0])
+        e_zorder = morton(e_ij, e_grf[0])
+        v_zorder = morton(v_ij, v_grf[0])
+
+        # fig, ax = plt.subplots()
+        # ax.scatter(grid.c_lon_lat[c_grf[0][0]:, 0], grid.c_lon_lat[c_grf[0][0]:, 1], c=c_zorder[c_grf[0][0]:] - c_grf[0][0])
+        # ax.scatter(c_lonlat_rm[c_grf[0][0]:, 0], c_lonlat_rm[c_grf[0][0]:, 1], c=c_ij[c_grf[0][0]:,0])
+        # ax.autoscale()
+        # plt.show()
+        
+        # ax.scatter(e_lonlat_rm[e_grf[0][0]:, 0], e_lonlat_rm[e_grf[0][0]:, 1], c=e_zorder[e_grf[0][0]:] - e_grf[0][0])
+        # ax.scatter(e_lonlat_rm[e_grf[0][0]:, 0], e_lonlat_rm[e_grf[0][0]:, 1], c=e_ij[e_grf[0][0]:,0])
+        # ax.autoscale()
+        # plt.show()
+
+        c_perm = np.argsort(c_zorder)
+        e_perm = np.argsort(e_zorder)
+        v_perm = np.argsort(v_zorder)
+
+        for cur_grid in grid_set:
+            apply_permutation(cur_grid.data_set, c_perm, cur_grid.schema, LocationType.Cell)
+            apply_permutation(cur_grid.data_set, e_perm, cur_grid.schema, LocationType.Edge)
+            apply_permutation(cur_grid.data_set, v_perm, cur_grid.schema, LocationType.Vertex)
 
     if fix_hole_in_grid:
         fix_hole(grid_set.grid.data_set, grid_set.grid.schema)

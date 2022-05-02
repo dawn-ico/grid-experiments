@@ -7,6 +7,7 @@ from matplotlib import (
     collections,
 )
 import netCDF4
+from reordering import range_to_slice
 
 
 def order_around(center, points):
@@ -125,8 +126,8 @@ def plot_grid(fname: str, location: LocationType):
 
     # plot "trace" of elements
     # ax.plot(grid.v_lon_lat[range_to_slice(v_grf[0]), 0], grid.v_lon_lat[range_to_slice(v_grf[0]), 1], 'o-')
-    # ax.plot(grid.e_lon_lat[range_to_slice(e_grf[0]), 0], grid.e_lon_lat[range_to_slice(e_grf[0]), 1], 'o-')
-    # ax.plot(grid.c_lon_lat[range_to_slice(c_grf[0]), 0], grid.c_lon_lat[range_to_slice(c_grf[0]), 1], 'o-')
+    # ax.plot(grid.e_lon_lat[7000:, 0], grid.e_lon_lat[7000:, 1], 'o-')
+    # ax.plot(grid.e_lon_lat[grid.e_grf[13][0]:, 0], grid.e_lon_lat[grid.e_grf[13][0]:, 1], 'o-')
 
     # plot some onions
     # ax.plot(grid.c_lon_lat[0:814, 0], grid.c_lon_lat[0:814, 1], "o")
@@ -149,4 +150,4 @@ def plot_grid(fname: str, location: LocationType):
 
 
 if __name__ == "__main__":
-    plot_grid("grid_row-major.nc", LocationType.Cell)
+    plot_grid("my_pool/data/ICON/mch/grids/ch_r04b09/grid.nc", LocationType.Vertex)
