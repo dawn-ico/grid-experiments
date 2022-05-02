@@ -483,7 +483,8 @@ def assign_ij(positions: ndarray,
 
     tresh = 0.01
     
-    i,j = 0   
+    i = 0   
+    j = 0
     for piter in range(start_idx, end_idx-1):       
         ij[piter,:] = [i,j]       
 
