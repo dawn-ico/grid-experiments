@@ -7,9 +7,16 @@ from reordering import reorder_pool_folder, fix_hole
 from grid_types import GridSet
 
 
-def row_major_permutation(grid_set: GridSet, fix_hole_in_grid: bool, apply_morton: bool):
+def row_major_permutation(
+    grid_set: GridSet, fix_hole_in_grid: bool, apply_morton: bool, sort_nbh: bool
+):
     grid_set.copy_to_staging()
-    reorder_pool_folder(grid_set, fix_hole_in_grid=fix_hole_in_grid, apply_morton=apply_morton)
+    reorder_pool_folder(
+        grid_set,
+        fix_hole_in_grid=fix_hole_in_grid,
+        apply_morton=apply_morton,
+        sort_tables=sort_nbh,
+    )
     grid_set.copy_to_pool("morton" if apply_morton else "row-major")
 
 
@@ -36,6 +43,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--fix_hole", action="store_true", help="fix hole present in icon grid"
     )
+    parser.add_argument("--sort_tables", action="store_true", help="sort nbh tables")
     args = parser.parse_args()
 
     arg_flags = [args.icon, args.row_major, args.morton]
@@ -48,9 +56,19 @@ if __name__ == "__main__":
 
     if args.icon:
         reset_to_icon(grid_set, fix_hole_in_grid=args.fix_hole)
-    
+
     if args.row_major:
-        row_major_permutation(grid_set, fix_hole_in_grid=args.fix_hole, apply_morton=False)
+        row_major_permutation(
+            grid_set,
+            fix_hole_in_grid=args.fix_hole,
+            apply_morton=False,
+            sort_nbh=args.sort_tables,
+        )
 
     if args.morton:
-        row_major_permutation(grid_set, fix_hole_in_grid=args.fix_hole, apply_morton=True)
+        row_major_permutation(
+            grid_set,
+            fix_hole_in_grid=args.fix_hole,
+            apply_morton=True,
+            sort_nbh=args.sort_tables,
+        )

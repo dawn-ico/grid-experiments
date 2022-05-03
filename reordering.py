@@ -52,6 +52,24 @@ def apply_permutation(
         field[:] = array
 
 
+def sort_nbh_list(ncf, schema: GridScheme) -> None:
+    nbh_lists = {
+        # "edges_of_vertex",       DO NOT REORDER THIS (fails probtest)
+        "cells_of_vertex",
+        # "edge_vertices",         DO NOT REORDER THIS (fails probtest)
+        # "adjacent_cell_of_edge", DO NOT REORDER THIS (crashes icon)
+        "vertex_of_cell",
+        # "edge_of_cell",          DO NOT REORDER THIS (fails probtest)
+    }
+
+    for field_name, descr in schema.items():
+        if field_name in nbh_lists:
+            field = ncf.variables[field_name]
+            array = np.copy(field[:])
+            array.sort(axis=0)
+            field[:] = array
+
+
 def fix_hole(ncf, schema: GridScheme):
     for field_name, descr in schema.items():
 
@@ -474,43 +492,52 @@ class SimpleRowMajorSorting:
         )
 
 
-def assign_ij(positions: ndarray, 
-              idx_range: typing.Tuple[typing.Optional[int], typing.Optional[int]] = (None, None),
-              stagger: bool = False):
+def assign_ij(
+    positions: ndarray,
+    idx_range: typing.Tuple[typing.Optional[int], typing.Optional[int]] = (None, None),
+    stagger: bool = False,
+):
     start_idx, end_idx = idx_range
-    curx = positions[start_idx,0]       
+    curx = positions[start_idx, 0]
     ij = -np.ones_like(positions)
 
     tresh = 0.01
-    
-    i = 0   
+
+    i = 0
     j = 0
-    for piter in range(start_idx, end_idx-1):       
-        ij[piter,:] = [i,j]       
+    for piter in range(start_idx, end_idx - 1):
+        ij[piter, :] = [i, j]
 
         # peek and reset if next is on next element is on next line
-        nextx = positions[piter+1, 0]
-        if abs(nextx-curx) > tresh:
-            j = j+1
-            i = 0        
+        nextx = positions[piter + 1, 0]
+        if abs(nextx - curx) > tresh:
+            j = j + 1
+            i = 0
 
         # stagger edge lines (every other edge line has twice the amount of edges)
-        i = i + 2 if stagger and j%2 == 1 else i+1
+        i = i + 2 if stagger and j % 2 == 1 else i + 1
         curx = nextx
-    
-    ij[-1,:] = [i,j]
+
+    ij[-1, :] = [i, j]
     return ij
 
-def morton(cartesian: ndarray, idx_range: typing.Tuple[typing.Optional[int], typing.Optional[int]] = (None, None)):
+
+def morton(
+    cartesian: ndarray,
+    idx_range: typing.Tuple[typing.Optional[int], typing.Optional[int]] = (None, None),
+):
     start_idx, end_idx = idx_range
     n = cartesian.shape[0]
     perm = np.arange(0, n)
-    for iter in range(start_idx, end_idx):       
-        zorder = pm.interleave(int(cartesian[iter,0]), int(cartesian[iter,1]))
+    for iter in range(start_idx, end_idx):
+        zorder = pm.interleave(int(cartesian[iter, 0]), int(cartesian[iter, 1]))
         perm[iter] = start_idx + zorder
     return perm
 
-def reorder_pool_folder(grid_set: GridSet, fix_hole_in_grid: bool, apply_morton: bool):
+
+def reorder_pool_folder(
+    grid_set: GridSet, fix_hole_in_grid: bool, apply_morton: bool, sort_tables: bool
+):
     grid_file = netCDF4.Dataset(grid_set.grid.fname + ".nc")
     grid = Grid.from_netCDF4(grid_file)
 
@@ -543,28 +570,9 @@ def reorder_pool_folder(grid_set: GridSet, fix_hole_in_grid: bool, apply_morton:
     for cur_grid in grid_set:
         apply_permutation(cur_grid.data_set, c_perm, cur_grid.schema, LocationType.Cell)
         apply_permutation(cur_grid.data_set, e_perm, cur_grid.schema, LocationType.Edge)
-        apply_permutation(cur_grid.data_set, v_perm, cur_grid.schema, LocationType.Vertex)
-
-    
-    # # sort the neighbors to improve coalescing in the neighbor tables
-    # grid.v2e[grid.v2e == DEVICE_MISSING_VALUE] = grid.ne + 1
-    # grid.v2e = np.sort(grid.v2e)
-    # grid.v2e[grid.v2e == grid.ne + 1] = DEVICE_MISSING_VALUE
-    # grid.v2c[grid.v2c == DEVICE_MISSING_VALUE] = grid.nc + 1
-    # grid.v2c = np.sort(grid.v2c)
-    # grid.v2c[grid.v2c == grid.nc + 1] = DEVICE_MISSING_VALUE
-
-    # # sort the neighbors to improve coalescing in the neighbor tables
-    # # (no `DEVICE_MISSING_VALUE` in this table)
-    # grid.e2v = np.sort(grid.e2v)
-    # grid.e2c[grid.e2c == DEVICE_MISSING_VALUE] = grid.nc + 1
-    # grid.e2c = np.sort(grid.e2c)
-    # grid.e2c[grid.e2c == grid.nc + 1] = DEVICE_MISSING_VALUE
-
-    # # sort the neighbors to improve coalescing in the neighbor tables
-    # # (no `DEVICE_MISSING_VALUE` in these tables)
-    # grid.c2v = np.sort(grid.c2v)
-    # grid.c2e = np.sort(grid.c2e)
+        apply_permutation(
+            cur_grid.data_set, v_perm, cur_grid.schema, LocationType.Vertex
+        )
 
     if apply_morton:
         c_lonlat_rm = np.take(grid.c_lon_lat, c_perm, axis=0)
@@ -573,7 +581,7 @@ def reorder_pool_folder(grid_set: GridSet, fix_hole_in_grid: bool, apply_morton:
 
         # assign i,j values
         c_ij = assign_ij(c_lonlat_rm, c_grf[0])
-        e_ij = assign_ij(e_lonlat_rm, e_grf[0], stagger = True)
+        e_ij = assign_ij(e_lonlat_rm, e_grf[0], stagger=True)
         v_ij = assign_ij(v_lonlat_rm, v_grf[0])
 
         # cartesian i,j --> morton
@@ -586,11 +594,20 @@ def reorder_pool_folder(grid_set: GridSet, fix_hole_in_grid: bool, apply_morton:
         v_perm = np.argsort(v_zorder)
 
         for cur_grid in grid_set:
-            apply_permutation(cur_grid.data_set, c_perm, cur_grid.schema, LocationType.Cell)
-            apply_permutation(cur_grid.data_set, e_perm, cur_grid.schema, LocationType.Edge)
-            apply_permutation(cur_grid.data_set, v_perm, cur_grid.schema, LocationType.Vertex)
+            apply_permutation(
+                cur_grid.data_set, c_perm, cur_grid.schema, LocationType.Cell
+            )
+            apply_permutation(
+                cur_grid.data_set, e_perm, cur_grid.schema, LocationType.Edge
+            )
+            apply_permutation(
+                cur_grid.data_set, v_perm, cur_grid.schema, LocationType.Vertex
+            )
 
     if fix_hole_in_grid:
         fix_hole(grid_set.grid.data_set, grid_set.grid.schema)
+
+    if sort_tables:
+        sort_nbh_list(grid_set.grid.data_set, grid_set.grid.schema)
 
     grid_set.sync_data_sets()
