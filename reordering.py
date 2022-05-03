@@ -483,7 +483,8 @@ def assign_ij(positions: ndarray,
 
     tresh = 0.01
     
-    i,j = 0   
+    i = 0   
+    j = 0
     for piter in range(start_idx, end_idx-1):       
         ij[piter,:] = [i,j]       
 
@@ -495,7 +496,7 @@ def assign_ij(positions: ndarray,
 
         # stagger edge lines (every other edge line has twice the amount of edges)
         i = i + 2 if stagger and j%2 == 1 else i+1
-        x = curx
+        curx = nextx
     
     ij[-1,:] = [i,j]
     return ij
@@ -544,6 +545,27 @@ def reorder_pool_folder(grid_set: GridSet, fix_hole_in_grid: bool, apply_morton:
         apply_permutation(cur_grid.data_set, e_perm, cur_grid.schema, LocationType.Edge)
         apply_permutation(cur_grid.data_set, v_perm, cur_grid.schema, LocationType.Vertex)
 
+    
+    # # sort the neighbors to improve coalescing in the neighbor tables
+    # grid.v2e[grid.v2e == DEVICE_MISSING_VALUE] = grid.ne + 1
+    # grid.v2e = np.sort(grid.v2e)
+    # grid.v2e[grid.v2e == grid.ne + 1] = DEVICE_MISSING_VALUE
+    # grid.v2c[grid.v2c == DEVICE_MISSING_VALUE] = grid.nc + 1
+    # grid.v2c = np.sort(grid.v2c)
+    # grid.v2c[grid.v2c == grid.nc + 1] = DEVICE_MISSING_VALUE
+
+    # # sort the neighbors to improve coalescing in the neighbor tables
+    # # (no `DEVICE_MISSING_VALUE` in this table)
+    # grid.e2v = np.sort(grid.e2v)
+    # grid.e2c[grid.e2c == DEVICE_MISSING_VALUE] = grid.nc + 1
+    # grid.e2c = np.sort(grid.e2c)
+    # grid.e2c[grid.e2c == grid.nc + 1] = DEVICE_MISSING_VALUE
+
+    # # sort the neighbors to improve coalescing in the neighbor tables
+    # # (no `DEVICE_MISSING_VALUE` in these tables)
+    # grid.c2v = np.sort(grid.c2v)
+    # grid.c2e = np.sort(grid.c2e)
+
     if apply_morton:
         c_lonlat_rm = np.take(grid.c_lon_lat, c_perm, axis=0)
         e_lonlat_rm = np.take(grid.e_lon_lat, e_perm, axis=0)
@@ -558,17 +580,6 @@ def reorder_pool_folder(grid_set: GridSet, fix_hole_in_grid: bool, apply_morton:
         c_zorder = morton(c_ij, c_grf[0])
         e_zorder = morton(e_ij, e_grf[0])
         v_zorder = morton(v_ij, v_grf[0])
-
-        # fig, ax = plt.subplots()
-        # ax.scatter(grid.c_lon_lat[c_grf[0][0]:, 0], grid.c_lon_lat[c_grf[0][0]:, 1], c=c_zorder[c_grf[0][0]:] - c_grf[0][0])
-        # ax.scatter(c_lonlat_rm[c_grf[0][0]:, 0], c_lonlat_rm[c_grf[0][0]:, 1], c=c_ij[c_grf[0][0]:,0])
-        # ax.autoscale()
-        # plt.show()
-        
-        # ax.scatter(e_lonlat_rm[e_grf[0][0]:, 0], e_lonlat_rm[e_grf[0][0]:, 1], c=e_zorder[e_grf[0][0]:] - e_grf[0][0])
-        # ax.scatter(e_lonlat_rm[e_grf[0][0]:, 0], e_lonlat_rm[e_grf[0][0]:, 1], c=e_ij[e_grf[0][0]:,0])
-        # ax.autoscale()
-        # plt.show()
 
         c_perm = np.argsort(c_zorder)
         e_perm = np.argsort(e_zorder)
